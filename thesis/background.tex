@@ -21,5 +21,147 @@ different needs covered by logging and cite some popular logging systems.
 \section{Archipelago}\label{sec:archip-bkg}
 
 \section{Tracing Systems}\label{sec:tracing-bkg}
+Understanding where time has been spent in performing a computation or servicing
+a request is at the forefront of the performance analyst’s mind. Measurements
+are available from every layer of a computing system, from the lowest level of
+the hardware up to the top of the distributed application stack. In recent years
+we have seen the emergence of tools which can be used to directly trace events
+relevant to performance. This is augmenting the traditional event count and
+system state instrumentation, and together they can provide a very detailed view
+of activity in the complex computing systems prevalent today.
+
+Event tracing has the advantage of keeping the performance data tied to the
+individual requests, allowing deep inspection of a request which is useful when
+performance problems arise. The technique is also exceptionally well suited to
+exposing transient latency problems. The downsides are increased overheads
+(sometimes significantly) in terms of instrumentation costs as well as volumes
+of information produced. To address this, every effort is taken to reduce the
+cost of tracing - it is common for tracing to be enabled only conditionally, or
+even dynamically inserted into the instrumented software and removed when no
+longer being used.
+
+In early 1994, a technique called dynamic instrumentation or Dyninst API
+\cite{dynist} was
+proposed to provide efficient, scalable and detailed data collection for
+large-scale parallel applications (Hollingsworth et al., 1994). Being one of the
+first tracing systems, the infrastructure built for data extraction was limited.
+The operating systems at hand were not able to provide efficient services for
+data extraction. They had to build a data transport component to read the
+tracing data, using the ptrace function, that was based on a time slice to read
+data. A time slice handler was called at the end of each time slice, i.e when
+the program was scheduled out, and the data would be read by the data transport
+program built on top.
+
+This framework made possible new tools like DynaProf \cite{dynaprof} and
+graphical user interface for data analysis. DynaProf is a dynamic profiling tool
+that provides a command line interface, similar to gdb, used to interact with
+the DPCL API and to basically control tracing all over your system.
+
+Kernel tracing brought a new dimension to infrastructure design, having the
+problem of extracting data out of the kernel memory space to make it available
+in user-space for analysis. The K42 project \cite{k42}  used shared
+buffers between kernel and user space memory, which had obvious security issues.
+A provided daemon waked up periodically and emptied out the buffers where all
+client trace control had to go through. This project was a research prototype
+aimed at improving tracing performance. Usability and security was simply
+sacrificed for the proof of concept. For example, a traced application could
+write to these shared buffers and read or corrupt the tracing data for another
+application, belonging to another user.
+
+In the next sections, recent tracers and how they built their tracing
+infrastructure will be examined.
+
+\subsection{Magpie}
+
+One of the earliest and most comprehensive event tracing frameworks is Magpie
+\cite{magpie}.  This project builds on the Event Tracing for Windows
+infrastructure which underlies all event tracing on the Microsoft Windows
+platform. Magpie is aimed primarily at workload modelling and focuses on
+tracking the paths taken by application level requests right through a system.
+This is implemented through an instrumentation framework with accurate and
+coordinated timestamp generation between user and kernel space, and with the
+ability to associate resource utilisation information with individual events.
+
+The Magpie literature demonstrates not only the ability to construct high-level
+models of a distributed system resource utilisation driven via Magpie event
+tracking, but also provides case studies of low-level performance analysis,
+such as diagnosing anomalies in individual device driver performance. Magpie
+utilises a novel concept in behavioural clustering, where requests with similar
+behaviour (in terms of temporal alignment and resource consumption) are
+grouped. This clustering underlies the workload modelling capability, with each
+cluster containing a group of requests, a measure of “cluster diameter”, and
+one selected “representative request” or “centroid”. The calculation of cluster
+diameter indicates deep event knowledge and inspection capabilities, and
+although not expanded on it implies detailed knowledge of individual types of
+events and their parameters. This indicates a need for significant user
+intervention to extend the system beyond standard operating system level
+events.
+
+As an aside, it is worth noting here that, for the first time, we see in Magpie
+the use of a binary tree graph to represent the flow of control between events
+and sub-events across distinct client/server processes and/or hosts.
+
+\subsection{DTrace}
+Then, Sun Microsystemsa released, in 2005, DTrace \cite{dtrace} which offers the
+ability to dynamically instrument both user-level and kernel-level software. As
+part of a mass effort by Sun, a lot of tracepoints were added to the Solaris 10
+kernel and user space applications. Projects like FreeBSD and NetBSD also ported
+dtrace to their platform, as later did Mac OS X. The goal was to help developers
+find serious performance problems. The intent was to deploy it across all
+Solaris servers and to use it in production.  If we look at the DTrace
+architecture, it uses multiple data providers, which are basically probes used
+to gather tracing data and write it to memory buffers.  The framework provides a
+user space library (libdtrace) which interacts with the tracer through ioctl
+system calls. Through those calls, the DTrace kernel framework returns specific
+crafted data for immediate analysis by the dtrace command line tool. Thus, every
+interaction with the DTrace tracer is made through the kernel, even user space
+tracing.  On a security aspect, groups were made available for different level
+of user privileges. You have to be in the dtrace proc group to trace your own
+applications and in the dtrace kernel group to trace the kernel.  A third group,
+dtrace user, permits only system call tracing and profiling of the user own
+processes.  This work was an important step forward in managing tracing in
+current operating systems in production environment. The choice of going through
+the kernel, even for user space tracing, is a performance trade-off between
+security and usability.
+
+\subsection{SystemTap}
+In early 2005, Red Hat released SystemTap \cite{systemtap} which also
+offers dynamic instrumentation of the Linux kernel and user applications. In
+order to trace, the user needs to write scripts which are loaded in a tapset
+library. SystemTap then translates these in C code to create a kernel module.
+Once loaded, the module provides tracing data to user space for analysis.
+Two system groups namely stapdev and stapusr are available to separate possible
+trac- ing actions. The stapdev group can do any action over Systemtap
+facilities, which makes it the administrative group for all tracing control (Don
+Domingo, 2010) and module creation.
+The second group, stapusr, can only load already compiled modules located in
+specific protected directories which only contain certified modules.
+The project also provides a compile-server which listens for secure TCP/IP
+connections using SSL and handles module compilation requests from any certified
+client. This acts as a SystemTap central module registry to authenticate and
+validate kernel modules before loading them.
+This has a very limited security scheme for two reasons. First, privileged
+rights are still needed for specific task like running the compilation server
+and loading the modules, since the tool provided by Systemtap is set with the
+setuid bit. Secondly, for user space tracing, only users in SystemTap’s group
+are able to trace their own application, which implies that a privileged user
+has to add individual users to at least the stapusr group at some point in time,
+creating important user management overhead.
+It is worth noting that the compilation server acts mostly as a security barrier
+for kernel module control. However, like DTrace, the problem remains that it
+still relies on the kernel for all tracing actions. Therefore, there is still a
+bottleneck on performance if we consider that a production system could have
+hundreds of instrumented applications tracing simultaneously. This back and
+forth in the kernel, for tracing control and data retrieval, cannot possibly
+scale well.
+
+\subsection{Conclustion}
+It is obvious from the previous analysis that the systems mentioned do not fit
+in our demands concerning the added overhead to the instrumented application
+since the solution pass through the kernel space. This makes them unsuitable for
+live tracing. The solution for for the BlkKin tracing backend was given from the
+Linux Trace Toolkit - next generation (LTTng) because it provides separate
+mechanisms for kernel and user space tracing. LTTng is furthered examined in
+Chapter \ref{}.   
 
 \section{Logging Systems}\label{sec:logging-bkg}
