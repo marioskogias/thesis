@@ -165,3 +165,87 @@ mechanisms for kernel and user space tracing. LTTng is furthered examined in
 Chapter \ref{}.   
 
 \section{Logging Systems}\label{sec:logging-bkg}
+
+Logs are a critical part of any system, they give you insight into what a system
+is doing as well what happened. Unlike tracing, log data are not low-level and
+do not refer to the system's performance and there is no special care about the
+overhead that logging add to the system. Virtually every process running on a
+system generates logs in some form or another. Usually, these logs are written
+to files on local disks. When your system grows to multiple hosts, managing the
+logs and accessing them can get complicated. Searching for a particular error
+across hundreds of log files on hundreds of servers is difficult without good
+tools. A common approach to this problem is to setup a centralized logging
+solution so that multiple logs can be aggregated in a central location.
+
+There are various options for log data aggregation as well as for visualizing
+the aggregated data. Some of them are cited here:
+
+\subsection{Syslog}
+
+Syslog is a standard for computer message logging. It permits separation of the
+software that generates messages from the system that stores them and the
+software that reports and analyzes them.
+
+Syslog can be used for computer system management and security auditing as well
+as generalized informational, analysis, and debugging messages. It is supported
+by a wide variety of devices (like printers and routers) and receivers across
+multiple platforms. Because of this, syslog can be used to integrate log data
+from many different types of systems into a central repository.
+
+Messages are labeled with a facility code (one of: auth, authpriv, daemon, cron,
+ftp, lpr, kern, mail, news, syslog, user, uucp, local0 ... local7) indicating
+the type of software that generated the messages, and are assigned a severity
+(one of: Emergency, Alert, Critical, Error, Warning, Notice, Info, Debug).
+
+Implementations are available for many operating systems. Specific configuration
+may permit directing messages to various devices (console), files (/var/log/) or
+remote syslog servers. Most implementations also provide a command line utility,
+often called logger, that can send messages to the syslog. Some implementations
+permit the filtering and display of syslog messages.
+
+Syslog is standardized by the IETF in RFC 5424. This standardization specifies a
+very important characteristic of Syslog that we would like to have available in
+our tracing infrastructure and this is severity levels. Every event to be traced
+is associated with a severity level varying from Emergency when the system is
+unusable to informational or debug level messages. From the syslog side the
+administrator can define which events he is interested about. So, for testing
+environments more events should be traced, while for production environments the
+events to be traced should be restricted to the absolutely needed. 
+
+\subsection{Scribe}
+A new class of solutions that have come about have been designed for high-volume
+and high-throughput log and event collection. Most of these solutions are more
+general purpose event streaming and processing systems and logging is just one
+use case that can be solved using them. They generally consist of logging
+clients and/or agents on each specific host. The agents forward logs to a
+cluster of collectors which in turn forward the messages to a scalable storage
+tier. The idea is that the collection tier is horizontally scalable to grow with
+the increase number of logging hosts and messages. Similarly, the storage tier
+is also intended to scale horizontally to grow with increased volume. This is
+gross simplification of all of these tools but they are a step beyond
+traditional syslog options.
+
+One popular solution is Scribe. Scribe is a server for aggregating log data
+that's streamed in real time from clients. It is designed to be scalable and
+reliable.  It was used and released by Facebook as open source. Scribe is
+written in C++ and it worths mentioning its transport layer and how Scribe
+logging data are processed.
+
+Concerning its \textbf{transport} layer, Scribe uses Thrift
+\footnote{https://thrift.apache.org/}. The Apache Thrift software framework, for
+scalable cross-language services development, combines a software stack with a
+code generation engine to build services that work efficiently and seamlessly
+between different programming languages. After describing the service in a
+specific file (thrift file), the framework is  responsible for generating the
+code to be used to easily build RPC clients and servers that communicate
+seamlessly across programming languages. For Scribe especially the thrift file
+is the following:  
+
+\ccode{Scribe thrift definition file}{scribe.thrift}
+
+In the above file a \texttt Log method is defined, which takes a list of \texttt
+LogEntry items as parameter. Every \texttt LogEntry consists of two strings, a
+category and a message. Based on this file, using Thrift we can create Scribe
+clients for every programming language.
+\subsection{Graphite}
+\subsection{Gagglia}
