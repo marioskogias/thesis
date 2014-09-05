@@ -155,15 +155,6 @@ hundreds of instrumented applications tracing simultaneously. This back and
 forth in the kernel, for tracing control and data retrieval, cannot possibly
 scale well.
 
-\subsection{Conclustion}
-It is obvious from the previous analysis that the systems mentioned do not fit
-in our demands concerning the added overhead to the instrumented application
-since the solution pass through the kernel space. This makes them unsuitable for
-live tracing. The solution for for the BlkKin tracing backend was given from the
-Linux Trace Toolkit - next generation (LTTng) because it provides separate
-mechanisms for kernel and user space tracing. LTTng is furthered examined in
-Chapter \ref{}.   
-
 \section{Logging Systems}\label{sec:logging-bkg}
 
 Logs are a critical part of any system, they give you insight into what a system
@@ -225,20 +216,20 @@ is also intended to scale horizontally to grow with increased volume. This is
 gross simplification of all of these tools but they are a step beyond
 traditional syslog options.
 
-One popular solution is Scribe
-\footnote{https://github.com/facebookarchive/scribe}. Scribe is a server for
-aggregating log data that's streamed in real time from clients. It is designed
-to be scalable and reliable.  It was used and released by Facebook as open
-source. Scribe is written in C++ and it worths mentioning its transport layer
-and how Scribe logging data are processed and finally stored.
+One popular solution is
+Scribe\footnote{https://github.com/facebookarchive/scribe}. Scribe is a server
+for aggregating log data that's streamed in real time from clients. It is
+designed to be scalable and reliable.  It was used and released by Facebook as
+open source. Scribe is written in C++ and it worths mentioning its transport
+layer and how Scribe logging data are processed and finally stored.
 
-Concerning its \textbf{transport} layer, Scribe uses Thrift
-\footnote{https://thrift.apache.org/}. The Apache Thrift software framework, for
-scalable cross-language services development, combines a software stack with a
-code generation engine to build services that work efficiently and seamlessly
-between different programming languages. After describing the service in a
-specific file (thrift file), the framework is  responsible for generating the
-code to be used to easily build RPC clients and servers that communicate
+Concerning its \textbf{transport} layer, Scribe uses
+Thrift\footnote{https://thrift.apache.org/}. The Apache Thrift software
+framework, for scalable cross-language services development, combines a software
+stack with a code generation engine to build services that work efficiently and
+seamlessly between different programming languages. After describing the service
+in a specific file (thrift file), the framework is  responsible for generating
+the code to be used to easily build RPC clients and servers that communicate
 seamlessly across programming languages. For Scribe especially the thrift file
 is the following:  
 
@@ -266,6 +257,101 @@ server that forwards data to the next Scribe server. In case of congestion or of
 network problems, data are stored locally and forwarded when the problem is
 restored.
 
-\subsection{Graphite}
+\subsection{Graphite} 
+Graphite is an enterprise-scale monitoring tool that runs well on cheap
+hardware. It is released under the open source Apache 2.0 license and it is
+used by many big companies like Google and Canonical. Although Graphite is not
+responsible for collecting data, it can store efficiently numeric time-series
+data and render graphs of this data on demand. Graphite can cooperate with other
+tools like collectd\footnote{https://collectd.org/} for data aggregation.
 
-\subsection{Gagglia}
+From an architectural aspect, Graphite consists of 3 software components:
+
+\begin{description}
+\item[carbon] - a Twisted daemon that listens for time-series data
+\item[whisper] - a simple database library for storing time-series data (similar
+in design to RRD)
+\item[graphite webapp] - A Django webapp that renders graphs on-demand using
+Cairo\footnote{http://www.cairographics.org/}
+\end{description}
+
+\subsection{Ganglia}
+Ganglia\cite{ganglia} is a scalable distributed monitoring system for high performance
+computing systems such as clusters and Grids and grew out of the University of
+California, Berkeley. It is based on a hierarchical design targeted at
+federations of clusters. It relies on a multicast-based listen/announce protocol
+to monitor state within clusters and uses a tree of point-to-point connections
+amongst representative cluster nodes to federate clusters and aggregate their
+state. It leverages widely used technologies such as XMLfor data representation,
+XDR for compact, portable data transport, and RRDtool for data storage and
+visualization. It uses carefully engineered data structures and algorithms to
+achieve very low per-node overheads and high concurrency. The implementation is
+robust, has been ported to an extensive set of operating systems and processor
+architectures, and is currently in use on over 500 clusters around the world. 
+
+\diagram{Ganglia architecture}{ganglia-architecture.png}
+
+Ganglia architecture is made up of the following components.
+
+\begin{description}
+
+\item[gmond] The Ganglia MONitor Daemon is a data-collecting agent that you must
+install on every node in a cluster. Gmond gathers metrics about the local node
+and sends information to other nodes via XML to a browser window. Gmond is
+portable and collects system metrics, such as CPU, memory, disk, network and
+process data. The Gmond configuration file /etc/gmond.conf controls the Gmond
+daemon and resides on each node where Gmond is installed.
+    
+\item[gmetad] The Ganglia METAdata Daemon is a data-consolidating agent that
+provides a query mechanism for collecting historical information about groups of
+machines. Gmetad is typically installed on a single, task-oriented server (the
+monitoring node), though very large clusters could require more than one Gmetad
+daemon. Gmetad collects data from other Gmetad and Gmond sources and stores
+their state in indexed RRDtool (round-robin) databases, where a Web interface
+reads and returns information about the cluster. The Gmetad configuration file
+/etc/gmetad.conf controls the Gmetad daemon and resides on the monitoring node.
+    
+\item[RRDtool] RRDTool is an open-source data logging and graphing system that
+Ganglia uses to store the collected data and to render the graphs for Web-based
+reports. Cron jobs that run in the background to collect information from the HP
+Vertica monitoring system tables are stored in the RRD database.
+    
+\item[PHP-based Web interface] — The PHP-based Web interface contains a
+collection of scripts that both the Ganglia Web reporting front end and the HP
+Vertica extensions use. The Web server starts these scripts, which then collect
+HP Vertica‑specific metrics from the RRD database and generate the XML graphs.
+These scripts provide access to HP Vertica health across the cluster, as well as
+on each host.
+
+\item[Web server] The Web server uses lighttpd, a lightweight http server that
+can be any Web server that supports PHP, SSL, and XML. The Ganglia web front end
+displays the data stored by Gmetad in a graphical web interface using PHP.
+\item[Advanced tools] Gmetric, an executable, is added during Ganglia
+installation. Gmetric provides additional statistics and is used to store
+user-defined metrics, such as numbers or strings with units.
+
+\end{description}
+
+\section{Conclusion}
+To sum up, it is obvious from the previous analysis that the tracing systems
+mentioned do not fit in our demands concerning the added overhead to the
+instrumented application since their solutions pass through the kernel space.
+This extra overhead makes them unsuitable for live tracing. The solution for
+for the BlkKin tracing backend was given from the Linux Trace Toolkit - next
+generation (LTTng) because it provides separate mechanisms for kernel and user
+space tracing. LTTng is furthered examined in Chapter \ref{}.
+
+Concerning the logging systems, we need to imitate their architecture for
+BlkKin's architecture, since we need a central trace aggragation point and a UI
+that visualizes the information. We can conclude that we need:
+\begin{itemize}
+\item[tracing daemon] that runs on every cluster node and collects data  with a low-overhead
+\item[central data collector] where all tracing information are stored
+\item[Web UI] where tracing information are rendered in a way that extracts the necessary
+information revealing problems and performance issues in the first place.
+For more elaborate information extraction, trace information can be furthered
+processed apart from the UI.  
+\end{itemize}
+For data collection, we are going to use LTTng, while for the data aggregation and the visualization we
+are going to use Zipkin, a distributed tracing system created by Twitter. Zipkin
+as well as the reasons for our choice are furthered examined in Chapter \ref{}.
