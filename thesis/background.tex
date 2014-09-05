@@ -225,11 +225,12 @@ is also intended to scale horizontally to grow with increased volume. This is
 gross simplification of all of these tools but they are a step beyond
 traditional syslog options.
 
-One popular solution is Scribe. Scribe is a server for aggregating log data
-that's streamed in real time from clients. It is designed to be scalable and
-reliable.  It was used and released by Facebook as open source. Scribe is
-written in C++ and it worths mentioning its transport layer and how Scribe
-logging data are processed.
+One popular solution is Scribe
+\footnote{https://github.com/facebookarchive/scribe}. Scribe is a server for
+aggregating log data that's streamed in real time from clients. It is designed
+to be scalable and reliable.  It was used and released by Facebook as open
+source. Scribe is written in C++ and it worths mentioning its transport layer
+and how Scribe logging data are processed and finally stored.
 
 Concerning its \textbf{transport} layer, Scribe uses Thrift
 \footnote{https://thrift.apache.org/}. The Apache Thrift software framework, for
@@ -243,9 +244,28 @@ is the following:
 
 \ccode{Scribe thrift definition file}{scribe.thrift}
 
-In the above file a \texttt Log method is defined, which takes a list of \texttt
-LogEntry items as parameter. Every \texttt LogEntry consists of two strings, a
-category and a message. Based on this file, using Thrift we can create Scribe
-clients for every programming language.
+In the above file a \texttt Log method is defined, which takes a list of
+\texttt LogEntry items as parameter. Every \texttt LogEntry consists of two
+strings, a category and a message. This specific Log method can return two
+different results codes, either `OK' or `TRY\_LATER'. Based on this file, using
+Thrift we can create Scribe clients for every programming language.
+
+Concerning \textbf{data manipulation} Scribe provides the following options.
+Based on the message's category, it can store the log entries in different
+files, one per category. Also Scribe has Hadoop support and can store the
+tracing information to an HDFS so that they can be processed later using
+Map-Reduce jobs.
+
+Scribe servers are arranged in a directed graph, with each server
+knowing only about the next server in the graph. This network topology allows
+for adding extra layers of fan-in, as a system grows and batching messages
+before sending them between datacenters as well as providing reliability in case
+of intermittent connectivity or node failure. So a Scribe server can operate
+either as a terminal server where data are finally stored, or as an intermediate
+server that forwards data to the next Scribe server. In case of congestion or of
+network problems, data are stored locally and forwarded when the problem is
+restored.
+
 \subsection{Graphite}
+
 \subsection{Gagglia}
