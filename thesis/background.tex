@@ -96,9 +96,61 @@ point of failure, which means that adding new nodes
 theoretically does not add any communication overhead.
 \end{itemize}
 
-Ceph's basic components can be seen in Figure \ref{fig:ceph.png}
+Ceph's building blocks can be seen in Figure \ref{fig:ceph.png}
 
-\diagram{Ceph components}{ceph.png}
+\diagram{Ceph abstraction}{ceph.png}
+
+RADOS operations are based on the following components:
+\begin{itemize}
+    \item \textit{object store daemons}, which are userspace processes that run 
+        in the storage backend and are responsible for storing the data.
+    \item \textit{monitor daemons}, which are monitoring userspace processes 
+        that run in an odd number of servers that form a Paxos part-time 
+        parliament\cite{Paxos}. Their main responsibility is holding and 
+        reliably updating the mapping of objects to object store daemons, as 
+        well as self-healing when an object store daemon or monitor daemon has 
+        crashed.
+\end{itemize}
+
+Ceph's logic is based on \textit CRUSH algorithm. According to this algorithm a
+map is created, called CRUSH map, which maps objects to store daemons. A
+fundamental idea in RADOS is the \textit{placement group} (pg). Placement groups
+are used for load balancing. The number of placement groups is predefined. Then,
+when we want to create a new object, its name is hashed and assigned to a
+specific group. Each placement group makes IO requests to the same OSDs. So,
+objects belonging to the same pg, will be replicated across the same OSDs. The
+relationship between placement groups and object store daemons is stored in
+CRUSH maps that each monitor daemon holds.   
+  
+Since we would like to instrument RADOS code and measure its performance, apart
+from the theoretical background, we should also explain some of its operating
+internals, so that further analysis is consolidated. So, in brief, we will try
+to explain an IO request's route within a RADOS infrastructure.
+
+Although, as seen in Figure \ref{fig:ceph.png}, RADOS has multiple entry points
+(RBD, CephFS, RADOSGW), we are interested in the interaction with librados.
+Librados provides a well defined API for data manipulation and control, namely
+an API that enables to modify (CRUD) objects and interact with the Ceph
+monitors. There are binding for various languages like C, Python and Java. 
+
+Hypothetically, we have an application using librados, which can also run
+remotely from the RADOS cluster. The application want to write an objects. So, a
+nIO request is initiated from librados. RADOS employs an asynchronous, ordered
+point to point message passing library for communication. So, this request is
+serialized and a TCP message is created and sent to the RADOS cluster. After
+receive, this packet is handled by the equivalent RADOS Messenger classes,
+decoded and based on its kind, is placed in a \textit{dispatch queue} to be
+served. This specific object belongs to a specific placement group. So, when the
+request reaches the top of the queue, based on this pg, the equivalent OSD
+undertakes its serving. Based on the replication factor, the equivalent number
+of replication requests is sent to other OSDs responsible for the same pg.
+During request handling per OSD, based on the request type, there are phases
+like \textit{Journal Access} and finally the \textit{Filestore Access}.
+
+From the above analysis, we understood that request processing in RADOS is a
+perplexed procedure including multiple remote nodes collaborating. The only way
+to understand the internals and debug possible latencies and bottlenecks is
+through tracing and this is what we are going to examine further in this thesis.
 
 \section{Archipelago}\label{sec:archip-bkg}
 
