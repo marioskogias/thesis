@@ -7,7 +7,7 @@ our choice. The approach made is rudimentary, intended to introduce a reader
 with elementary knowledge on distributed systems.
 
 Specifically, Section \ref{sec:storage} covers the concepts around distributed
-storage systems and they difficulties concerning their monitoring.  In Section
+storage systems and the difficulties concerning their monitoring.  In Section
 \ref{sec:archip-bkg} we describe Archipelago, Synnefo's Volume Service, and how
 IO requests initiated within the virtual machine end up being served by a
 distributed storage system. In Section \ref{sec:tracing-bkg} we explain the need
@@ -17,6 +17,88 @@ different needs covered by logging and cite some popular logging systems.
 
 
 \section{Distributed storage systems}\label{sec:storage}
+
+Providing reliable, high-performance storage that scales has been an ongoing
+challenge for system designers. High-throughput and low-latency storage for file
+systems, databases, and related abstractions are critical to the performance of
+a broad range of applications. Historically, data centers first created
+`islands' of SCSI disk arrays as direct-attached storage (DAS), each dedicated
+to an application, and visible as a number of `virtual hard drives' (i.e.
+LUNs). Initally, a SAN (Storage-Area-Network) consolidates such storage islands
+together using a high-speed network. However, a SAN does not provide file
+abstraction, only block-level operations. Also, the cost of scaling a SAN
+infrastructure scales exponentially. These boosted the development of more
+\emph{service-oriented-architectures}. Emerging clustered storage architectures
+constructed from storage bricks or object storage devices (OSDs) seek to
+distribute low-level block allocation decisions and security enforcement to
+intelligent storage devices, simplifying data layout and eliminating I/O
+bottlenecks by facilitating direct client access to data. OSDs constructed from
+commodity components combine a CPU, network interface, and local cache with an
+underlying disk or RAID, and replace the convention block-based storage
+interface with one based on named, variable-length objects. As storage clusters
+grow to thousands of devices or more, consistent management of data placement,
+failure detection, and failure recovery places an increasingly large burden on
+client, controller, or metadata directory nodes, limiting scalability.
+
+One of the design principles of object storage is to abstract some of the lower
+layers of storage away from the administrators and applications. Thus, data is
+exposed and managed as objects instead of files or blocks. Objects contain
+additional descriptive properties which can be used for better indexing or
+management. Administrators do not have to perform lower level storage functions
+like constructing and managing logical volumes to utilize disk capacity or
+setting RAID levels to deal with disk failure. File metadata are explicitly
+separate from data and data manipulation is allowed through programmatic
+interfaces. These interfaces include CRUD functions for basic read, write and
+delete operations, while some object storage implementations go further,
+supporting additional functionality like object versioning, object replication,
+and movement of objects between different tiers and types of storage. Most API
+implementations are ReST-based, allowing the use of many standard HTTP calls.
+This results in the abstraction shown in Figure
+\ref{fig:object_storage_arch.png}.
+ 
+\diagram{Storage Abstraction}{object_storage_arch.png}
+
+Alhtough they differ substantially concerning their implementation, some of the
+most popular examples of such systems are: Amazon S3, OpenStack Swift and RADOS.
+
+However, one common characteristic of all these systems, that led to the
+development of this thesis, is that they provide an architecture that easily
+scales out, based on APIs, but which is difficult to monitor and find out what
+really went wrong in case of a problem. This leads to a di-centralized data
+collection and a centralized data processing architecture for tracing
+information which is further explained in Chapter \ref{}.
+
+\subsection{RADOS}\label{sec:rados}
+RADOS stands for  Reliable, Autonomic Distributed Object Store. It is the object
+store component of Ceph\footnote{http://ceph.com/}.Ceph is a free distributed
+object store and file system that has been created by Sage Weil for his doctoral
+dissertationi\cite{weil-thesis} and has been supported by his company, Inktank,
+ever since.  RADOS seeks to leverage device intelligence to distribute the
+complexity surrounding consistent data access, redundant storage, failure
+detection, and failure recovery in clusters consisting of many thousands of
+storage devices.
+
+RADOS basic characteristics are:
+\begin{itemize}
+\item \textit{Replication}, which means that there can be many copies
+of the same object so that the object is always accessible,
+even when a node experiences a failure.
+\item \textit{Fault tolerance}, which is achieved by not having a
+single point of failure. Instead, RADOS uses elected servers
+called \textbf{monitors}, each of which have mappings of the
+storage nodes where the objects and their replicas are stored.
+\item \textit{Self-management}, which is possible since monitors know
+at any time the status of the storage nodes and, for example,
+can command to create new object replicas if a node experiences
+a failure.
+\item \textit{Scalability}, which is aided by the fact that there is no
+point of failure, which means that adding new nodes
+theoretically does not add any communication overhead.
+\end{itemize}
+
+Ceph's basic components can be seen in Figure \ref{fig:ceph.png}
+
+\diagram{Ceph components}{ceph.png}
 
 \section{Archipelago}\label{sec:archip-bkg}
 
