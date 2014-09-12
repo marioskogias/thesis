@@ -154,6 +154,88 @@ through tracing and this is what we are going to examine further in this thesis.
 
 \section{Archipelago}\label{sec:archip-bkg}
 
+\subsection{Overview}
+Archipelago is a distributed storage layer and is part of the Synnefo cloud
+software. It decouples Volume and File operations/logic from the actual
+underlying storage technology, used to store data. It provides a unified way to
+provision, handle and present Volumes and Files independently of the storage
+backend. It also implements thin clones, snapshots, and deduplication, and has
+pluggable drivers for different backend storage technologies. It was primarily
+designed to solve problems that arise on large scale cloud environments.
+Archipelago's end goal is to:
+
+\begin{itemize}        
+\item Decouple storage logic from the actual data store 
+\item Provide logic for thin cloning and snapshotting 
+\item Provide logic for deduplication 
+\item Provide different endpoint drivers to access Volumes and Files 
+\item Provide backend drivers for different storage technologies
+\end{itemize}
+
+As it is show in Figure \ref{fig:archipelago-overview.png}, Archipelago lies
+between the VM's block device and the underlying storage level.
+  
+\diagram{Archipelago Overview}{archipelago-overview.png}
+
+\subsection{Archipelago Internals}
+
+Archipelago has a modular internal architecture consisting of multiple
+components communicating over a custom made IPC mechanism called \textit XSEG.
+Each component communicating over XSEG is called \textit peer. 
+
+XSEG is a custom mechanism that defines a common communication protocol for all
+peers, regardless of their type (userspace/kernspace,
+singlethreared/multithreaded). It builds a shared-memory segment, where peers
+can share data using zero-copy techniques. 
+
+\diagram{Archipelago APIs}{archip-endp.png}
+
+Peers are considered either the Archipelago endpoints (Figure
+\ref{fig:archip-endp.png}):
+\begin{itemize}
+\item block device driver
+\item qemu driver
+\item user provided process
+\item command line tool
+\item http gateway for files
+\end{itemize}
+
+or the Archipelago internal components:
+
+\begin{description}
+
+\item[VoLuMeComposerDaemon(vlmcd)]
+vlmcd accepts requests from the endpoints and translates them to object
+requests, with the help of mapperd.
+
+\item[MapperDaemon(mapperd)]
+mapperd is responsible for the mapping of volumes to objects. This means that it
+must tackle a broad set of tasks such as knowing the objects that a volume
+consists of, cloning and snapshotting volumes and creating new ones.
+
+\item[BlockerDaemon(blockerd)]
+blockerd is not a specific entity but a family of drivers, each of which is
+written for a specific storage type (as seen at the down part of Figure
+\ref{fig:archip-endp.png}).Blockers have a single purpose, to read/write objects
+from/to the storage.Currently, there are blockers for NFS and the RADOS object
+storage.
+
+\end{description} 
+
+Figure \ref{fig:archip-comm.png} shows the interaction between the different
+peers over XSEG for a VM to perform an IO operation.
+
+\diagram{XSEG communication}{archip-comm.png}
+
+As it is obvious from the above analysis, Archipelago's modular design is based
+on XSEG. XSEG affects significantly the overall Archipelago performance. So, we
+would like to have a mechanism that enables Archipelago monitoring without
+degrading Archipelago performance. This mechanism would reveal the latencies and
+bottlenecks between the several peers and enable Archipelago engineers to
+improve its performance. This mechanism is the proposed BlkKin system.
+Specifically, we will use BlkKin to monitor and measure the path from the QEMU
+driver until the storage layer.
+
 \section{Tracing Systems}\label{sec:tracing-bkg}
 Understanding where time has been spent in performing a computation or servicing
 a request is at the forefront of the performance analyst’s mind. Measurements
