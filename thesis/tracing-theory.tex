@@ -100,9 +100,7 @@ So, in order to feed Zipkin with data a Scribe client is needed. As metioned in
 Chapter \ref{sec:logging-bkg} about Scribe, a category and a message is needed
 to log to Scribe. Zipkin messages are also Thrift encoded so that the collector
 and treat them and add them in the database. Zipkin thrift messages are encoded
-according to the following thrift file: 
-
-\ccode{Zipkin message thrift definition file}{zipkin.thrift}
+according to the following thrift file. 
 
 This thift file defines:
 
@@ -114,3 +112,17 @@ annotation
 \item[Span] is also the Dapper span identified by its name, id, trace and parent
 ids and can contain multiple annotations.
 \end{description} 
+
+\ccode{Zipkin message thrift definition file}{zipkin.thrift}\label{zipkin.thrift}
+
+Concerning the final data storage Zipkin provides various choices including SQL
+databases like SQLite, MySQL, and PostgreSQL as well as NoSQL databases like
+Cassandra and even Redis. However, like Twitter, we preferred to use Cassandra
+for our installation because of its performance.
+
+So, the resulting Zipkin architecture can be seen in Figure
+\ref{fig:zipkin-architecture.png}
+
+\diagram{Zipkin Architecture}{zipkin-architecture.png}
+
+sergsergserg
