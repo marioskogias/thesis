@@ -1,0 +1,116 @@
+\chapter{Tracing semantics}\label{ch:dapper-zipkin}
+
+Apart from the mechanism that enable tracing, it is very important to choose
+what kind of information concerning the application is finally logged. A wise
+choice will ease the process of data correlation and assumption extraction. In
+this chapter, we cite the different schools behind tracing semantics, we analyze
+our tracing choice and finally we discuss how this choice is implemented.
+
+\section{Data correlation}\label{sec:data-cor}
+
+Data resulting after tracing can be very bulky. Consequently, the process of
+extracting the information needed that triggered tracing is challenging. Data
+should be correlated and only the needed parts of the logs should be isolated
+and processed in order to extract meaningful information. This requires that
+tracing data are capable of being correlated. By data correlation we refer to
+data that refer to a specific subsystem or a specific request grouping.
+
+Although there have been proposed many different tracing schemes, according to
+specific applications' needs, all these schemes can be summarized into two
+categories. According to Google's Dapper paper\cite{dapper} these categories
+are:
+
+\begin{description}
+
+\item[black-box] schemes \cite{blackbox1, blackbox2} assume there is no
+additional information other than the message record described above, and use
+statistical regression techniques to infer that association.
+
+\item[annotation-based] schemes \cite{magpie, xtrace} rely on applications or
+middleware to explicitly tag every record with a global identifier that links
+these message records back to the originating request.
+
+\end{description}
+
+While black-box schemes are more portable than annotation-based methods, they
+need more data in order to gain sufficient accuracy due to their reliance on
+statistical inference. The key disadvantage of annotation-based methods is,
+obviously, the need to manually instrument programs by adding instrumentation
+points in their source code.
+
+As mentioned, BlkKin wants to achieve an end-to-end tracing so that latencies
+and faults between the different subsystem layers to become obvious. So, we
+decided to use an annotation-based tracing schema.
+
+\section{Dapper tracing concepts}\label{sec:dapper}
+
+Dapper\cite{dapper} is a large scale distributed systems tracing infrastructure
+created by Google. It uses an annotation-based tracing scheme, which enables
+Google developers to monitor Google infrastructure only by instrumenting a small
+set of common libraries (RPC system, control flow). Although it is closed
+source, the tracing semantics used in Dapper are publicly available and have
+been used in BlkKin's development. Indeed, Google proposed a complete
+annotation-based scheme, which describes the following concepts for tracing:
+
+\begin{description}
+\item[annotation]
+The actual information being logged. There are two kinds of annotations. Either
+\emph{timestamp}, where the specific timestamp of an event is being logged or
+\emph{key-value}, where a specific key-value pair is being logged.
+\item[span]
+The basic unit of the process tree. Each specific processing phase can be
+depicted as a different span. Each span should have a specific name and a
+distinct span id. It is important to note that each span can contain information
+from multiple hosts.
+\item[trace]
+Every span is associated with a specific trace. A different trace id is used to
+group data so that all spans associated with the same initial request share the
+common trace id. For our case, information concerning a specific IO request
+share the same trace id and each distinct IO request initiates a new trace id.
+\item[parent span]
+In order to depict the causal relationships between different spans in a single
+trace, parent span id is used. Spans without a parent span ids are  known as
+\emph{root spans}.
+\end{description}
+
+The previous concepts fit out demands for end-to-end tracing. So, we implemented
+them in a tracing library for C/C++ applications, which is described thoroughly
+in Chapter \ref{}.
+ 
+\section{Zipkin: a Dapper open-source implementation}\label{sec:zipkin}
+
+Dapper does not only describe the tracing semantics mentioned before, but is a
+full stack tracing infrastructure which includes subsystems to aggregate data
+per host, a central collector, a storage service and a user interface to query
+across the collected information. BlkKin, also has the same needs. So, to cover
+some of them, instead of rewriting the needed subsystems, we decided to use
+\textit{Zipkin}.
+
+Zipkin\footnote{http://twitter.github.io/zipkin/} is an open-source
+implementation of the Dapper paper by Twitter. It is used to gather timing data
+for all the disparate services at Twitter. It manages both the collection and
+lookup of this data through a Collector and a Query service as well as the data
+presentation through a Web UI. Zipkin is written in Scala, while the UI is
+written in Ruby and Javascript using the D3.js\footnote{http://d3js.org/}
+framework. So, Zipkin is a full-stack systems that encapsulates the Dapper
+tracing semantics out of the box. This is why we chose to use Zipkin.
+
+Concerning transportation, Zipkin uses Scribe, which enables Zipkin to Scale.
+So, in order to feed Zipkin with data a Scribe client is needed. As metioned in
+Chapter \ref{sec:logging-bkg} about Scribe, a category and a message is needed
+to log to Scribe. Zipkin messages are also Thrift encoded so that the collector
+and treat them and add them in the database. Zipkin thrift messages are encoded
+according to the following thrift file: 
+
+\ccode{Zipkin message thrift definition file}{zipkin.thrift}
+
+This thift file defines:
+
+\begin{description}
+\item[Endpoint] is the location when an annotation took place. An endpoint is
+identified by its name, ip and port.
+\item[Annotation] is the tracing information itself, exactly like the Dapper
+annotation
+\item[Span] is also the Dapper span identified by its name, id, trace and parent
+ids and can contain multiple annotations.
+\end{description} 
