@@ -1,1 +1,81 @@
 \chapter{Linux Trace Toolkit - next generation (LTTng)}\label{ch:lttng}
+
+In this chapter we analyze Linux Trace Toolkin - next generation (LTTng), which
+was our choice for BlkKin's tracing backend, and we describe its internal
+characteristics that led us to using it. Specifically, we give an overall
+outline of its architecture and basic notions in Section
+\ref{sec:lttng-overview}. Then, we describe the buffering scheme used both for
+kernel and user space (Section \ref{sec:buffers}) and we continue by citing
+kernel and use space implementation mechanism in Sections
+\ref{sec:kernel-tracing}, \ref{sec:user-tracing}. Finally we cite the tracing
+format used by LTTng (Section \ref{sec:ctf}) and the mechanism for live tracing
+in Section \label{sec:relayd}.
+
+\section{Overview}\label{sec:lttng-overview}
+
+Linux Trace Toolkin - next generation is the successor of Linux Trace Toolkit.
+It started as the Mathew Desnoyer's PhD dissertation \cite{desnoyer} in École
+Polytechnique de Montréal. Since then, it is maintained by EfficiOS
+Inc\footnote{http://www.efficios.com/} and the DORSAL lab in  École
+Polytechnique de Montréal.
+
+The LTTng project aims at providing highly efficient tracing tools for Linux.
+Its tracers help tracking down performance issues and debugging problems
+involving multiple concurrent processes and threads. Tracing across multiple
+systems is also possible. This toolchain allows integrated kernel and user-space
+tracing from a single user interface. It was initially designed and implemented
+to reproduce, under tracing, problems occurring in normal conditions. It uses a
+linearly scalable and wait-free RCU (Read-Copy Update) synchronization mechanism
+and provides zero-copy data extraction. These mechanisms were implemented in
+kernel and then ported to user-space as well.
+ 
+Apart from LTTng's kernel tracer and userspace tracer, viewing and analysis
+tools are part of the project. In this thesis, we worked with and extended 
+\textit{Babeltrace} \footnote{http://lttng.org/babeltrace}.
+
+Apart from the fact LTTng is a complete toolchan that can be easily installed in
+almost any Linux distribution and the integrated kernel and user space tracing
+offered, we chose LTTng because of its minimal performance overhead. Since it
+was initially designed to `reproduce, under tracing, problems occurring in
+normal conditions', LTTng was the ideal tool to use for real-time low-overhead,
+block-storage tracing with BlkKin.
+
+In order to understand how LTTng manages to have such a good performance, we
+have to go through its internals. But first, we give an overview outline of its
+architecture and basic components. According to D. Goulet's Master thesis
+(\cite{goulet}), LTTng's architecture can be summarized as shown in Figure
+\ref{fig:lttng-arch.png}.  
+
+\diagram{LTTng Architecture}{lttng-arch.png}
+
+The \texttt{lttng} command line interface is a small program used to interact
+with the session daemon. Possible interaction are creating sessions, enabling
+events, starting tracing and so on. The use of this command line tool is further
+explained in Chapter \ref{} about how to use BlkKin.
+
+Tracing sessions are used to isolate users from each other and create coherent
+tracing data between all tracing sources (Ex: MariaDB vs Kernel). This
+\textit{session daemon} routes user commands to the tracers and keeps an
+internal state of the requested actions. The daemon makes sure that this
+internal state is in complete synchronization with the tracers, and therefore no
+direct communication with the tracers is allowed other than via the session
+daemon.  This daemon is self-contained between users. Each user can run its own
+session daemon but only one is allowed per user. No communication happens
+between daemons. 
+
+\textit{Consumer daemons} extract data from buffers containing recorded data and
+write it to disk for later analysis. There are two separate consumer daemons,
+one handling user space and the second one the kernel. A single consumer daemon
+handles all the user space (and similarly for kernel space) tracing sessions for
+a given session daemon. It is the session daemon that initiates the execution of
+the user space and kernel consumer daemons and feeds them with tracing commands.
+
+\section{Buffering scheme}\label{sec:buffers}
+
+\section{Kernelspace tracing}\label{sec:kernel-tracing}
+
+\section{Userspace tracing}\label{sec:user-tracing}
+
+\section{Common Trace Format (CTF)}\label{sec:ctf}
+
+\section{Live tracing}\label{sec:relayd}
