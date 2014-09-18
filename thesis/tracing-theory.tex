@@ -86,6 +86,8 @@ across the collected information. BlkKin, also has the same needs. So, to cover
 some of them, instead of rewriting the needed subsystems, we decided to use
 \textit{Zipkin}.
 
+\diagram{Zipkin Architecture}{zipkin-architecture.png}
+
 Zipkin\footnote{http://twitter.github.io/zipkin/} is an open-source
 implementation of the Dapper paper by Twitter. It is used to gather timing data
 for all the disparate services at Twitter. It manages both the collection and
@@ -100,7 +102,7 @@ So, in order to feed Zipkin with data a Scribe client is needed. As metioned in
 Chapter \ref{sec:logging-bkg} about Scribe, a category and a message is needed
 to log to Scribe. Zipkin messages are also Thrift encoded so that the collector
 and treat them and add them in the database. Zipkin thrift messages are encoded
-according to the following thrift file. 
+according to the following thrift file (Listing \ref{lst:zipkin.thrift}) 
 
 This thift file defines:
 
@@ -122,7 +124,3 @@ for our installation because of its performance.
 
 So, the resulting Zipkin architecture can be seen in Figure
 \ref{fig:zipkin-architecture.png}
-
-\diagram{Zipkin Architecture}{zipkin-architecture.png}
-
-sergsergserg
