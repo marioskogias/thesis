@@ -70,6 +70,48 @@ handles all the user space (and similarly for kernel space) tracing sessions for
 a given session daemon. It is the session daemon that initiates the execution of
 the user space and kernel consumer daemons and feeds them with tracing commands.
 
+LTTng internals define and make use of the following concepts in order to create
+an abstraction layer between the user and the tracers.
+ 
+\begin{description}
+
+\item[Domains] 
+are essentially a type of tracer or tracer/feature tuple.  Currently, there are
+two domains in lttng-tools. The first one is \texttt{UST} which is the global
+user space domain. Channels and events registered in that domain are enabled on
+all current and future registered user space applications. The other domain is
+\texttt{KERNEL}.  Three more domains are not yet implemented but are good
+examples of the tracer/feature concept. They are UST PID for specific PID
+tracing, UST EXEC NAME based on application name and UST PID FOLLOW CHILDREN
+which is the same as tracing a PID but follows spawned children.
+
+\item[Session]
+is an isolated container used to separate tracing sources and users from each
+other. It takes advantage of the session feature offered by the tracer.  Each
+tracing session has a human readable name (Ex.: myapps) and a directory path
+where all trace data is written. It also contains the user UID/GID, in order to
+handle permissions on the trace data and also determine who can
+interact with it. Credentials are passed through UNIX socket for that purpose.
+
+\item[Event] 
+relates to a TRACE EVENT statement in your application code or in the Linux
+kernel instrumentation.  Using the command line tool \texttt{lttng}, you can
+enable and disable events for a specific tracing session on a per domain basis.
+An event is always bound to a channel and associated tracing context.
+
+\item[Channels]
+existed in the earlier LTTng tracers but were hardcoded and specified by the
+tracer. In the new LTTng 2.0 version, channels are now definable by the user and
+completely customizable (size of buffers, number of subbuffer, read timer,
+etc.).  A channel contains a list of user specified events (e.g. system calls
+and scheduling switches) and context information (e.g. process id and priority).
+Channels are created on a per domain basis, thus each domain contains a list of
+channels that the user creates.  Each event type in a session can belong to a
+single channel. For example, if event A is enabled in channel 1, it cannot be
+enabled in channel 2. However, event A can be enabled in channel 2 (or channel 1
+but not both) of another session.
+\end{description}
+
 \section{Buffering scheme}\label{sec:buffers}
 
 \section{Kernelspace tracing}\label{sec:kernel-tracing}
