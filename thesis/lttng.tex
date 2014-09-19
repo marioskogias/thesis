@@ -126,18 +126,20 @@ many sub-buffers where slots are reserved sequentially.  A slot is a sub-buffer
 region reserved for exclusive write access by a probe.  This space is reserved
 to write either a sub-buffer header or an event header and payload. Figure
 \ref{fig:buffers.png} shows space being reserved. On CPU 0, space is reserved in
-sub-buffer 0 following event 0. In this buffer, the header and event 0 elements
-have been complelety written to the buffer. The grey area represents slots for
-which associated commit count increment has been done. Committing a reserved
-slot makes it available for reading. On CPU n, a slot is reserved in sub-buffer
-0 but is still uncommitted. It is however followed by a committed event. This is
-possible due to the non serial nature of event write and commit operations. This
-situation happens when execution is interrupted between space reservation and
-commit count update and another event must be written by the interrupt handler.
-Sub-buffer 1, belonging to CPU 0, shows a fully committed sub-buffer ready for
-reading.
+sub-buffer 0 following event 0. 
 
 \diagram{Channel layout}{buffers.png}
+
+In this buffer, the header and event 0 elements have been complelety written to
+the buffer. The grey area represents slots for which associated commit count
+increment has been done. Committing a reserved slot makes it available for
+reading. On CPU n, a slot is reserved in sub-buffer 0 but is still uncommitted.
+It is however followed by a committed event. This is possible due to the non
+serial nature of event write and commit operations. This situation happens when
+execution is interrupted between space reservation and commit count update and
+another event must be written by the interrupt handler.  Sub-buffer 1, belonging
+to CPU 0, shows a fully committed sub-buffer ready for reading.
+
 
 Events written in a reserved slot are made of a header and a variable-sized
 payload. The header contains information containing the time stamp associated
@@ -158,9 +160,83 @@ time a sub-buffer is filled. The read count is updated using a standard
 SMP-aware \texttt{CAS} operation. This is required because the reader thread can
 read sub-buffers from buffers belonging to a remote CPU.
 
-\section{Kernelspace tracing}\label{sec:kernel-tracing}
+In the next two sections we will present how tracing is achieved in the
+different domains, kernel and user space.
 
-\section{Userspace tracing}\label{sec:user-tracing}
+\section{Kernel-space tracing}\label{sec:kernel-tracing}
+
+In the previous section we described the buffering scheme used by LTTng. In this
+chapter we will analyze the kernel mechanism that enables LTTng to add a minimum
+overhead to the instrumented application during tracing or when the tracing is
+stopped.
+
+In order to trace the Linux kernel with minimum overhead and without hurting the
+performance when the tracing is disabled, the equivalent mechanism should be
+provided by the kernel. The initial approach of \textit{Kprobes}\cite{kprobes}
+Kprobes are a hardware breakpoint-based instrumentation approach. The Kprobe
+infrastructure dynamically replaces each kernel instruction to instrument with a
+breakpoint, which generates a trap each time the instruction is executed. A
+tracing probe can then be executed by the trap handler. However, due to the
+heavy performance impact of breakpoints, the inability to extract local
+variables anywhere in a function due to compiler optimizations, and the
+maintenance burden of keeping instrumentation separate from the kernel code, a
+more elaborate solution was needed.
+
+This solution was given by Mathew Desnoyers the Linux Kernel Markers
+\cite{kmarkers} and Tracepoints infrastructure. The markers and tracepoints
+allow us to declare instrumentation statically at the source-code level without
+affecting performance significantly and without adding the cost of a function
+call when instrumentation is disabled. Having extremely low-overhead when
+instrumentation is dynamically disabled is crucially important to provide Linux
+distributions the incentive to ship instrumented programs to their customers.
+Markers and tracepoints consist in a branch skipping a stack setup and function
+call when instrumentation is dynamically disabled (dormant). These individual
+instrumentation sites can be enabled dynamically at runtime by dynamic code
+modification, and only add low overhead when tracing. The typical overhead of a
+dormant marker or tracepoint has been measured to be below 1 cycle
+\cite{marker-perf} when cache-hot. Static declaration of tracepoints helps
+manage this instrumentation within the Linux kernel source-code. Given that the
+Linux kernel is a distributed collaborative project, enabling each kernel
+subsystem instrumentation to be maintained by separate maintainers helps
+distributing the burden of managing kernel-wide instrumentation.  However,
+statically declaring an instrumentation site for dynamic activation typically
+incurs a non-zero performance overhead due to the test and branch required to
+skip the instrumentation call. To overcome this limitation, Desnoyers created
+the concept of activating statically compiled code efficiently by dynamically
+modifying an immediate operand within an instruction, which is called Immediate
+Values \cite{marker-perf}. This mechanism replaces the standard memory read,
+loading the condition variable, by a constant folded in the immediate value
+encoding of an instruction operand. This removes any data memory access to test
+for disabled instrumentation by keeping all the information encoded in the
+instruction stream. However, this involves dynamically modifying code safely
+against concurrent multiprocessor accesses. This requires either stopping all
+processors for the duration of the modification, or using a more complex, yet
+more lightweight, core synchronization mechanism, our choice being the temporary
+breakpoint bypass \cite{bp-bypass}.
+
+In order to overcome a Kernel Markers' drawback, which was the limited type
+verification to scalar types due because its API is based on format string,
+\textit{Tracepoints}
+\footnote{https://www.kernel.org/doc/Documentation/trace/tracepoints.txt} were
+created.
+
+Two elements are required for tracepoints :
+\begin{itemize}
+\item A tracepoint definition, placed in a header file.
+\item The tracepoint statement, in C code.
+\end{itemize}
+
+In order to use tracepoints, you should include \texttt{linux/tracepoint.h}.
+
+Define an event in \texttt{include/trace/events/subsys.h} as shown in Listing
+\ref{lst:kernel-event.h}. You can use the Tracepoint within kernel code as shown
+in Listing \ref{lst:kernel-use.c}.
+
+\ccode{Kernel event definition}{kernel-event.h}
+\ccode{Kernel Tracepoint activation}{kernel-use.c}
+
+
+\section{User-space tracing}\label{sec:user-tracing}
 
 \section{Common Trace Format (CTF)}\label{sec:ctf}
 
