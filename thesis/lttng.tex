@@ -99,20 +99,64 @@ kernel instrumentation.  Using the command line tool \texttt{lttng}, you can
 enable and disable events for a specific tracing session on a per domain basis.
 An event is always bound to a channel and associated tracing context.
 
-\item[Channels]
-existed in the earlier LTTng tracers but were hardcoded and specified by the
-tracer. In the new LTTng 2.0 version, channels are now definable by the user and
-completely customizable (size of buffers, number of subbuffer, read timer,
-etc.).  A channel contains a list of user specified events (e.g. system calls
-and scheduling switches) and context information (e.g. process id and priority).
+\item[Channel]
+is a pipe between an information producer and consumer. They existed in the
+earlier LTTng tracers but were hardcoded and specified by the tracer. In the
+new LTTng 2.0 version, channels are now definable by the user and completely
+customizable (size of buffers, number of subbuffer, read timer, etc.).  A
+channel contains a list of user specified events (e.g. system calls and
+scheduling switches) and context information (e.g. process id and priority).
 Channels are created on a per domain basis, thus each domain contains a list of
 channels that the user creates.  Each event type in a session can belong to a
 single channel. For example, if event A is enabled in channel 1, it cannot be
-enabled in channel 2. However, event A can be enabled in channel 2 (or channel 1
-but not both) of another session.
+enabled in channel 2. However, event A can be enabled in channel 2 (or channel
+1 but not both) of another session.
+
 \end{description}
 
 \section{Buffering scheme}\label{sec:buffers}
+
+In this part we analyze the buffering scheme employed by LTTng for efficient
+tracing.
+
+As mentioned, a channel is a pipe between an information producer and consumer.
+It serves as a buffer to move data efficiently. It consists of one buffer per
+CPU to ensure cache locality and eliminate false-sharing. Each buffer is made of
+many sub-buffers where slots are reserved sequentially.  A slot is a sub-buffer
+region reserved for exclusive write access by a probe.  This space is reserved
+to write either a sub-buffer header or an event header and payload. Figure
+\ref{fig:buffers.png} shows space being reserved. On CPU 0, space is reserved in
+sub-buffer 0 following event 0. In this buffer, the header and event 0 elements
+have been complelety written to the buffer. The grey area represents slots for
+which associated commit count increment has been done. Committing a reserved
+slot makes it available for reading. On CPU n, a slot is reserved in sub-buffer
+0 but is still uncommitted. It is however followed by a committed event. This is
+possible due to the non serial nature of event write and commit operations. This
+situation happens when execution is interrupted between space reservation and
+commit count update and another event must be written by the interrupt handler.
+Sub-buffer 1, belonging to CPU 0, shows a fully committed sub-buffer ready for
+reading.
+
+\diagram{Channel layout}{buffers.png}
+
+Events written in a reserved slot are made of a header and a variable-sized
+payload. The header contains information containing the time stamp associated
+with the event and the event type (an integer identifier). The event type
+information allows parsing the payload and determining its size. The maximum
+slot size is bounded by the sub-buffer size. Both the number of the sub-buffers
+and their size can be configured by the \texttt{lttng} command line tool.
+
+In order to synchronize the producer and consumer scheme, LTTng makes use of
+atomic operations. The two atomic instructions required are the \texttt{CAS}
+(Compare-And-Swap) and a simple atomic increment. Each per-CPU buffer has a
+control structure which contains the \textit{write count}, the \textit{read
+count}, and an array of \textit{commit counts} and \textit{commit seq counters}.
+The counters \textit{commit count} keep track of the amount of data committed in
+a sub-buffer using a lightweight increment instruction. The \textit{commit seq}
+counters are updated with a concurrency-aware synchronization primitive each
+time a sub-buffer is filled. The read count is updated using a standard
+SMP-aware \texttt{CAS} operation. This is required because the reader thread can
+read sub-buffers from buffers belonging to a remote CPU.
 
 \section{Kernelspace tracing}\label{sec:kernel-tracing}
 
