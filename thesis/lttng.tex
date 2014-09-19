@@ -186,33 +186,48 @@ This solution was given by Mathew Desnoyers the Linux Kernel Markers
 \cite{kmarkers} and Tracepoints infrastructure. The markers and tracepoints
 allow us to declare instrumentation statically at the source-code level without
 affecting performance significantly and without adding the cost of a function
-call when instrumentation is disabled. Having extremely low-overhead when
-instrumentation is dynamically disabled is crucially important to provide Linux
-distributions the incentive to ship instrumented programs to their customers.
-Markers and tracepoints consist in a branch skipping a stack setup and function
-call when instrumentation is dynamically disabled (dormant). These individual
-instrumentation sites can be enabled dynamically at runtime by dynamic code
-modification, and only add low overhead when tracing. The typical overhead of a
-dormant marker or tracepoint has been measured to be below 1 cycle
-\cite{marker-perf} when cache-hot. Static declaration of tracepoints helps
-manage this instrumentation within the Linux kernel source-code. Given that the
-Linux kernel is a distributed collaborative project, enabling each kernel
-subsystem instrumentation to be maintained by separate maintainers helps
-distributing the burden of managing kernel-wide instrumentation.  However,
-statically declaring an instrumentation site for dynamic activation typically
-incurs a non-zero performance overhead due to the test and branch required to
-skip the instrumentation call. To overcome this limitation, Desnoyers created
-the concept of activating statically compiled code efficiently by dynamically
-modifying an immediate operand within an instruction, which is called Immediate
-Values \cite{marker-perf}. This mechanism replaces the standard memory read,
-loading the condition variable, by a constant folded in the immediate value
-encoding of an instruction operand. This removes any data memory access to test
-for disabled instrumentation by keeping all the information encoded in the
-instruction stream. However, this involves dynamically modifying code safely
-against concurrent multiprocessor accesses. This requires either stopping all
-processors for the duration of the modification, or using a more complex, yet
-more lightweight, core synchronization mechanism, our choice being the temporary
-breakpoint bypass \cite{bp-bypass}.
+call when instrumentation is disabled. A marker placed in code provides a hook
+to call a function (probe) that can be provided at runtime. A marker can be
+`on' (a probe is connected to it) and the function is called so information is
+logged, or `off' (no probe is at- tached). When a marker is `off' it has no
+effect, except for adding a tiny time penalty (checking a condition for a
+branch). This instrumentation mechanism enables the instrumenta- tion of an
+application at the source-code level. Markers con- sists essentially of a C
+preprocessing macro which adds, in the instrumented function, a branch over a
+function call. By doing so, neither the stack setup nor the function call are
+ex- ecuted when the instrumentation is not enabled. At runtime, each marker can
+be individually enabled, which makes the branch execute both the stack setup
+and the function call 
+
+Having extremely low-overhead when instrumentation is dynamically disabled is
+crucially important to provide Linux distributions the incentive to ship
+instrumented programs to their customers. Markers and tracepoints consist in a
+branch skipping a stack setup and function call when instrumentation is
+dynamically disabled (dormant). These individual instrumentation sites can be
+enabled dynamically at runtime by dynamic code modification, and only add low
+overhead when tracing. The typical overhead of a dormant marker or tracepoint
+has been measured to be below 1 cycle \cite{marker-perf} when cache-hot. Static
+declaration of tracepoints helps manage this instrumentation within the Linux
+kernel source-code. Given that the Linux kernel is a distributed collaborative
+project, enabling each kernel subsystem instrumentation to be maintained by
+separate maintainers helps distributing the burden of managing kernel-wide
+instrumentation.  
+
+However, statically declaring an instrumentation site for dynamic activation
+typically incurs a non-zero performance overhead due to the test and branch
+required to skip the instrumentation call. To overcome this limitation,
+Desnoyers created the concept of activating statically compiled code
+efficiently by dynamically modifying an immediate operand within an
+instruction, which is called Immediate Values \cite{marker-perf}. This
+mechanism replaces the standard memory read, loading the condition variable, by
+a constant folded in the immediate value encoding of an instruction operand.
+This removes any data memory access to test for disabled instrumentation by
+keeping all the information encoded in the instruction stream. However, this
+involves dynamically modifying code safely against concurrent multiprocessor
+accesses. This requires either stopping all processors for the duration of the
+modification, or using a more complex, yet more lightweight, core
+synchronization mechanism. The choice made was the temporary breakpoint bypass
+\cite{bp-bypass}.
 
 In order to overcome a Kernel Markers' drawback, which was the limited type
 verification to scalar types due because its API is based on format string,
