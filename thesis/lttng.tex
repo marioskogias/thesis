@@ -286,6 +286,8 @@ synchronization.
 Since all these problems are handled by LTTng, in this section we will describe
 the mechanism behind a single tracing session.
 
+\diagram{User-space tracer architecture}{ust-architecture.png}
+
 As seen in Figure \ref{fig:ust-architecture.png}, each instrumented application
 creates a dedicated thread for tracing. This thread communicated with the
 sessiond over a UNIX-domain socket. The creation of this dedicated thread is
@@ -307,8 +309,13 @@ viewing using viewers like Babeltratrace\footnote{https://lttng.org/babeltrace}
 or LTTTV\footnote{https://lttng.org/lttv} only after the end of the session.
 This will be furthered discussed in Section \ref{sec:ctf}.
 
-\diagram{User-space tracer architecture}{ust-architecture.png}
- 
+The mechanism that supports the Tracepoints was ported in user-space as well, as
+mentioned in \cite{userspace-markers}. The user-space Tracepoints are defined in
+a header file. This file is compiled into an object file, which is finally
+linked along with the \texttt{liblttng-ust} with the instrumented application.
+So, the tracing threads will be created as mentioned and the tracepoint function
+calls, will trace information only when tracing is enabled.
+
 \section{Common Trace Format (CTF)}\label{sec:ctf}
 
 \section{Live tracing}\label{sec:relayd}
