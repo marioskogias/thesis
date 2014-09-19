@@ -235,9 +235,65 @@ in Listing \ref{lst:kernel-use.c}.
 \ccode{Kernel event definition}{kernel-event.h}
 \ccode{Kernel Tracepoint activation}{kernel-use.c}
 
+As far as LTTng is concerned, the traced data is entirely controlled by the
+kernel. According to \cite{desnoyer}, the kernel exposes a transport pipeline
+(Ex: character device or anonymous file descriptor) and a user space daemon
+(session daemon) simply extracts data through this mechanism. This mechanism is
+based on \texttt{DebugFS}
+\footnote{https://www.kernel.org/doc/Documentation/filesystems/debugfs.txt}
 
 \section{User-space tracing}\label{sec:user-tracing}
 
+User-space tracing needs a different approach from kernel-tracing. Approaches
+like SystemTap\footnote{https://sourceware.org/systemtap/} or
+DTrace\footnote{http://dtrace.org/blogs/} based user-space tracing on
+breakpoints or system-calls whenever a tracing point is reached. However, this
+has a severe performance impact on the instrumented application and makes them
+inappropriate for system monitoring. 
+
+During BlkKin implementation, we tried to implement a custom tracing mechanism
+based on a memory-mapped ring buffer. However, this mechanism should handle with
+all the consumer-producer concurrency issues. Inspecting the LTTng user-space
+tracer, we found out that the aforementioned buffering scheme (\ref{sec:buffers}
+is implemented for user-space tracing as well. This mechanism is not based on
+breakpoints or system-calls and does not affect the system's performance. So we
+decided to base out backend on LTTng ust-trace. 
+
+While the kernel tracer is the most complex entity in terms of code and
+algorithms, it is the simplest to handle. For the session daemon, this tracer is
+a single tracing source. However, tracing in user-space sets challenges
+concerning multiple users and concurrency. D. Goulet in his master thesis
+\cite{goulet} created the \texttt{lttng-tools} project, which provides the
+needed unified user and kernel tracing. This project handles with all the issues
+concerning multiple concurrent tracing sources and the mechanism for their
+synchronization.
+
+Since all these problems are handled by LTTng, in this section we will describe
+the mechanism behind a single tracing session.
+
+As seen in Figure \ref{fig:ust-architecture.png}, each instrumented application
+creates a dedicated thread for tracing. This thread communicated with the
+sessiond over a UNIX-domain socket. The creation of this dedicated thread is
+created when the instrumented application is launched. Its creation is coded
+within functions labeled with \texttt{\_\_attribute\_\_((constructor))}. The
+instrumented applications are dynamically linked with the ust libraries. So,
+when the object files are loaded, the specific code is executed and the threads
+are created. The session daemon communicates with the consumer over a
+UNIX-domain socket. Over this path pass all the control messages. For example,
+over these UNIX sockets pass the file descriptors of the shared memory segment,
+so that the consumer and the instrumented application refer to the same segment.
+The elaborate buffering scheme is deployed on a shared memory segment. The
+synchronization issues for the access to the segment are handled by the
+\texttt{liburcu}\footnote{https://lttng.org/urcu}. Whenever there are data
+available, the instrumented application notifies the consumer over a UNIX pipe.
+After that the consumer (which is different from the kernel consumer), writes
+the tracing data to a local folder. The tracing data will be available for
+viewing using viewers like Babeltratrace\footnote{https://lttng.org/babeltrace}
+or LTTTV\footnote{https://lttng.org/lttv} only after the end of the session.
+This will be furthered discussed in Section \ref{sec:ctf}.
+
+\diagram{User-space tracer architecture}{ust-architecture.png}
+ 
 \section{Common Trace Format (CTF)}\label{sec:ctf}
 
 \section{Live tracing}\label{sec:relayd}
