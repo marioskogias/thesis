@@ -389,3 +389,30 @@ and enabled live tracing, which is furthered analyzed in Section
 \ref{sec:relayd}.
 
 \section{Live tracing}\label{sec:relayd}
+
+In version 2.4.0 LTTng integrated live tracing support. Instead of waiting the
+end of the session in order to read the traces, lttng-live enabled developers to
+read the traces live while they are being created using Babeltrace. 
+
+In order to live read trace data, traces have to be streamed, even if the tracer
+and the viewer operate on the same machine. Live tracing is achieved through the
+use of special daemon called \texttt{relayd}. So, when creating the tracing
+session, you can define whether you prefer live tracing and then you have to
+provide the IP address of the realyd which runs on the remote machine. When the
+session starts, relayd stores data to the remote machine, so that they will be
+saved after the end of the session. In order to view the traces, you have to use
+Babeltrace which connects to the relayd and prints text data to the stdout, when
+they arrive over the network. Again Babeltrace can run on different machine from
+the one being traced and the one where relayd runs.
+
+LTTng relayd handles with the previous-mentioned metadata inconsistencies.
+Whenever new events appear, when a new instrumented application is launched for
+example, the relayd updates the metadata accordingly. As a result, the viewer
+(Babeltrace) receives from relayd a data packet with the actual tracing
+information and an index packet to properly locate the information. The updated
+metadata are also streamed to the client in a separate stream, as already
+mentioned. At any point, the live client must have all the metadata associated
+with the data packets it receives. The resulting interconnection is seen in
+Figure \ref{fig:relayd.png}.
+
+\diagram{LTTng live tracing}{relayd.png} 
