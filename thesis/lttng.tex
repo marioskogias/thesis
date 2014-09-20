@@ -318,4 +318,74 @@ calls, will trace information only when tracing is enabled.
 
 \section{Common Trace Format (CTF)}\label{sec:ctf}
 
+LTTng makes use of \textit{Common Trace Format}
+(CTF)\footnote{http://www.efficios.com/ctf} for the traces created. CTF is a
+trace format based on the requirements of the industry. It is the result of the
+collaboration between the Multicore
+assosication\footnote{http://www.multicore-association.org/} and the Linux
+community. This format was created to cover the tracing needs from versatile
+communities like the embedded, telecom, high-performance and kernel communities.
+It is a  high-level model meant to be an industry-wide, common model, fulfilling
+the tracing requirements. It is meant to be application-, architecture-, and
+language-agnostic. One major element of CTF is the Trace Stream Description
+Language (TSDL) which flexibility enables description of various binary trace
+stream layouts. The CTF format is formally described in RFC.
+
+According to this abstract model:
+
+A \textit{trace} is divided into multiple event streams. Each event stream
+contains a subset of the trace event types. The final output of the trace, after
+its generation and optional transport over the network, is expected to be either
+on permanent or temporary storage in a virtual file system. Because each event
+stream is appended to while a trace is being recorded, each is associated with a
+distinct set of files for output. Therefore, a stored trace can be represented
+as a directory containing zero, one or more files per stream.
+
+An \textit{event stream} can be divided into contiguous event packets of
+variable size. An event packet can contain a certain amount of padding at the
+end. The stream header is repeated at the beginning of each event packet
+
+CTF offers a variety of \textit{data types} for tracing, like integers, arrays
+or strings, which are defined in the RFC. Τhese types allow inheritance so
+that other types can be derived. 
+
+So an event representation in CTF consists of 
+
+The overall structure of an event is:
+
+\begin{description}
+\item[Event Header] \hfill \\
+(as specified by the stream meta-data). These information are the same for all
+streams in the trace. Example information: trace UUID
+\item[Stream Event Context] \hfill \\ 
+(as specified by the stream meta-data) The stream context is applied to all
+events within the stream. Example information: pid, payload size
+\item[Event Context] \hfill \\
+(as specified by the event meta-data) The event context contains information
+relative to the current event. Example information: missing fields
+\item[Event Payload] \hfill \\
+(as specified by the event meta-data) An event payload contains fields specific
+to a given event type
+\end{description}
+
+Each trace is associated with some metadata. For example, the trace stream
+layout description is located in the trace meta-data or the fields belonging to
+an event type are described in the event-specific meta-data. The meta-data is
+itself located in a separate stream identified by its name: `metadata'.
+
+
+The fact that the trace metadata are located in a different stream, prevents an
+LTTng `local' trace from being read (reliably) without stopping the tracing
+session. LTTng offers no guarantee that the metadata on disk contains all the
+layout information needed to read any packet previously flushed to disk. For
+example, a new application, instrumented with previously unknown events, could
+be launched and fill a buffer with events. That buffer would then be flushed to
+disk. At that point, there would be no guarantee that the lttng-sessiond would
+have had the chance to flush the updated metadata to disk. Thus, reading that
+trace would fail.
+
+So, in order to read an LTTng CTF-formatted event, LTTng created \texttt{relayd}
+and enabled live tracing, which is furthered analyzed in Section
+\ref{sec:relayd}.
+
 \section{Live tracing}\label{sec:relayd}
