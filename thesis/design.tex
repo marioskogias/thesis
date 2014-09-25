@@ -1,0 +1,36 @@
+\chapter{BlkKin Design}\label{ch:design}
+
+In the previous chapters we described the various challenges faced when dealing
+with distributed tracing and tools that can be used in order to achieve our
+tracing goals. In this chapter we cite the design of tracing infrastructure
+called BlkKin. The name comes from the amalgamation of \textit{Block storage}
+and \textit{Zipkin}, which is one of the used building blocks and was described
+thoroughly in Section \ref{sec:zipkin}.
+
+By building BlkKin we want to create a tracing infrastructure intended to cover
+the tracing needs created in software defined and distributed storage systems
+(but of course not restricted to them). We defined the following prerequisites
+that should be present in BlkKin:
+
+\begin{description}
+
+\item[low-overhead tracing] \hfill \\
+The traced system should be able to continue working in production scale serving
+real workloads in order to locate deficiencies and faults that are not obvious
+in debugging or tracing mode.
+
+\item[live-tracing]
+BlkKin should be able to send traces at the time the are being produced so that
+the developer or the administrator can have an overview of the system at that
+specific time.
+
+\item[Dapper tracing semantics]
+Tracing logic should be implemented in accordance with the concepts used by
+Dapper so that causal relationships and cross-layer architecture are depicted.
+
+\item[User interface]
+BlkKin should provide various endpoints for the end user to collect and analyze
+data. One of those should be a graphical user interface that gives a graphical
+overview of the system's performance per specific layer.
+
+\end{description}
