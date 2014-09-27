@@ -2,15 +2,19 @@
 
 In the previous chapters we described the various challenges faced when dealing
 with distributed tracing and tools that can be used in order to achieve our
-tracing goals. In this chapter we cite the design of tracing infrastructure
+tracing goals. In this chapter we cite the design of the tracing infrastructure
 called BlkKin. The name comes from the amalgamation of \textit{Block storage}
 and \textit{Zipkin}, which is one of the used building blocks and was described
-thoroughly in Section \ref{sec:zipkin}.
+thoroughly in Section \ref{sec:zipkin}. BlkKin uses different open-source
+technologies and is designed to scale. 
 
-By building BlkKin we want to create a tracing infrastructure intended to cover
-the tracing needs created in software defined and distributed storage systems
-(but of course not restricted to them). We defined the following prerequisites
-that should be present in BlkKin:
+By building BlkKin we wanted to create a tracing infrastructure intended to
+cover the tracing needs created in software defined and distributed storage
+systems (but of course not restricted to them). After investigating the various
+needs that this kind of systems and the people developing and monitoring them
+have, we tried to summarize the points that are needed for our tracing
+infrastructure. We defined the following prerequisites that should be present in
+BlkKin:
 
 \begin{description}
 
@@ -34,3 +38,190 @@ data. One of those should be a graphical user interface that gives a graphical
 overview of the system's performance per specific layer.
 
 \end{description}
+
+In the following sections we will step by step examine BlkKin. Specifically, in
+Section \ref{sec:rationale} we will describe the rationale behind Blkin, while
+Section \ref{sec:components} goes through BlkKin's components. Finally, in
+Section \ref{sec:flow} we illustrate the resulting BlkKin architecture and the
+flow of an IO request from the time created in the storage infrastructure until
+it ends up handled by BlkKin and stored.
+
+\section{Design rational}\label{sec:rationale}
+
+Since distributed systems follow a service-oriented architecture and consist of
+different software layers communicating with each other while running on
+different cluster nodes, we have to implement a tracing architecture that
+provides distributed tracing on each node, but collects all tracing data to a
+central repository. Thus, we can discover the relationships between the
+different layers. Otherwise, it would be impossible to find out what actions did
+a specific event on a specific node triggered throughout the cluster.
+
+So, imitating the monitoring systems architecture as described in Section
+\ref{sec:logging-bkg}, BlkKin consists of the following parts
+
+\begin{description}
+\item[tracing agent] \hfill \\
+This agent runs on every cluster node. It is responsible for capturing traces
+both from user and kernel-space. Is supposed to add minimum overhead to the
+instrumented application.
+
+\item[central data collector]
+The tracing agents from all the cluster nodes that we are interested about,
+should send the aggregated tracing information to a central collecting place so
+that they can be correlated. This system includes both the collecting part, a
+server that receives the data, and a storage system (database, file system),
+where information is finally kept.
+
+\item[User interface]
+The aggregated information should be available through a Web user-interface that
+depicts the correlation between the systems' distinct software layers. Through
+that interface the user should be able to locate the information he wants and
+make basic queries.
+
+\end{description}
+
+\section{BlkKin building blocks}\label{sec:components}
+
+After having identified our basic needs for BlkKin and respecting the proverb
+\textit{`not to reinvent the wheel'}, we turned to the open-source community to
+find projects that met our requirements and we could combine to build BlkKin.
+
+First we came across \textit{Zipkin} (see Section \ref{sec:zipkin} for more).
+Zipkin implements the Dapper semantics and provides a mechanism for data
+aggregation, data storage and a Web UI. So, we decided to employee Zipkin. Also,
+another crucial factor in favor of using Zipkin was the fact that it makes use
+of Scribe as a collector server. This is important because instead of storing
+tracing information in a database, we can store them in HDFS and run Map-Reduce
+jobs on them. An mentioned, tracing is notorious for the amount of data it
+produces. In order to manipulate that amount of data, Twitter engineers used
+distrubuted NoSQL databases and especially Cassandra. However, data from Zipkin
+that are stored in Cassandra follow a specific indexing pattern that is created
+in accordance with Zipkin's quering needs. This pattern makes hard (or even
+prevents) to run ad-hoc custom queries to extract any kind of correlation or
+information such as average values. Even Twitter uses Hadoop for these purposes.
+So we could use Zipkin for some visualizing purposes and HDFS for custom data
+manipulation using the same collecting mechanism and without the need to change
+data for the one or the other purpose. The same data stored in the Zipkin
+database and used to depict the causal relationships in the Web UI, can be
+stored in HDFS and investigated through Map-Reduce jobs.  
+
+Having covered the data collection and storage and the user-interface part, we
+had to create or use a system for the tracing agent. After some some custom
+endeavours to create such a system, we concluded that in order to be fast, this
+system has to use memory-mapped IO and specifically a ring buffer where a
+producer and a consumer exchange data. We created such a mechanism using a
+shared memory segment where the instrumented application wrote binary data and
+another daemon consumed them. However, we found out that to build such a
+mechanism, we had to solve multiple synchronization and concurrency problems and
+the situation would become more difficult with multi-threaded applications.
+Since BlkKin was designed to cope with production scale environments, we
+searched for a tested, open-source technology that covers that need. So, we
+decided to use LTTng. An mentioned in Section \ref{sec:user-tracing}, LTTng
+enables us to trace both kernel and user-space applications with the same
+infrastructure. Since LTTng uses tracepoints inserted in the source code, by
+using it we can deploy any tracing logic we want. In our case, we had decided
+beforehand to use an annotation-based logic through the Dapper semantics, custom
+instrumentation was exactly what we needed. Finally, LTTng has live tracing
+support, which could make use of. So, instantly another prerequisite was
+covered.
+
+\section{BlkKin contribution}
+
+At that point, after having decided about the different building blocks that
+BlkKin would use, we had to find a way to make them communicate. In this section
+we will explain how we made the above systems communicating with each other in
+order to created a unified tracing infrastructure. This contribution is returned
+to the open-source community and the major part was created during my
+participation in the Google Summer of Code 2014 in the LTTng project, under the
+supervision of Jeremie Galarneau.
+
+\subsection{BlkKin library}
+Since we had decided on the tracing infrastructure, we had to find a way to
+trace low-overhead application in accordance with the Dapper semantics. Although
+Zipkin provides a variety of instrumentation libraries for languages such as
+Java, Scala or Python, there was no such library for C/C++. So we created a
+C/C++ library in accordance with the Dapper semantics which provides a useful
+API with all the functions that a programmer would need to instrument such an
+application. This API is further explained in \ref{}. Although this library in
+backend-independent, which means that anybody could just keep the API and
+implement a custom tracing infrastructure, we implemented a backed based on
+LTTng. So, our library makes use of LTTng \texttt{tracepoint} in order to log
+the information we want. In addition, since we wanted to use BlkKin for
+monitoring purposes as well, BlkKin library should implement a kind of sampling.
+Otherwise, the amount of data created would be huge and the network traffic
+would be really high. Although a more elaborate mechanism for sampling could
+have been created, BlkKin currently implements only a rate sampling which means
+only 1/N root spans are actually initiated. Since we are talking about IO
+requests, the route of only one out of N requests will be actually traced.
+
+\subsection{Babeltrace plugins}
+As mentioned, Scribe uses Thrift as a communication protocol. So, we needed to
+implement a mechanism that would tranform LTTng data and send them to Scribe.
+LTTng data are encoded using the CTF format and Babeltrace is responsible for
+transforming these data to a human readable format. Consequently, we had to
+extend Babeltrace to communicate with Scribe. At first, we tried to implement
+this functionality within Babeltrace. So firstly we created a Scribe client
+written in C\footnote{https://github.com/marioskogias/scribe-c-client} which is
+used in Babeltrace. This version of
+Babeltrace\footnote{https://github.com/marioskogias/babeltrace/tree/scribe-client}
+was abandoned because Babeltrace internal code architecture was hard to extend.
+Instead, we decided to use the Babeltrace Python bindings and deploy this
+functionality as a babeltrace plugin. 
+
+So, using these Python bindings and the \texttt{facebook-scribe} module from
+\texttt{pip} we created two different plugins. The first plugin in generic and
+send to Scribe any kind of LTTng data after transforming them in a \textit{JSON
+format}.  Using this plugin, we can avoid the tedious job of searching for
+information within log-files. Instead, we can send our data to Scribe and store
+them in HDFS. After that creating simple Map-Reduce jobs that read JSON encoded
+data can subtract any information we want. The motivation for this functionality
+came from the Facebook's equivalent tracing infrastructure called
+Scuba\footnote{https://www.facebook.com/notes/facebook-engineering/under-the-hood-data-diving-with-scuba/10150599692628920}
+\cite{scuba}. 
+
+Finally, LTTng live tracing supports only CTF to text transformation and the
+above plugins could not be used for live tracing. So we had to extend Babeltrace
+live support. Because at the spefic moment of BlkKin's development, Babeltrace
+underwent a generic code refactoring. After that refactoring the above plugins
+would work with live support as well. Consequently, we offered just an
+evanescent solution for LTTng live tracing for Zipkin data. According to this
+solution, LTTng is obliged to log only specific tracepoints. After that,
+Babeltrace sends these data to a Python consumer communicating over a named
+Pipe. Implementation details are further explained in Section \ref{}.
+
+\section{BlkKin architecture and data flow}\label{sec:flow}
+
+In this section we present the overall BlkKin architecture and data flow. As we
+can see in Figure \ref{fig:blkin-internal.png} we have an application written in
+C/C++ we are interested to trace or monitor. After we have identified the
+different application layers and decided how to implement the Dapper semantics
+for it, we instrument its source code using the BlkKik library. The host where
+the application runs, run LTTng daemons as well. So, whenever an instrumentation
+point is reached, a \texttt{tracepoint} logs the tracing information to LTTng.
+After that, depending on whether we are having a live tracing session or not,
+the CTF data will be send either to the \texttt{relayd} or to local storage. In
+case of live tracing, our version of Babeltrace will communicate with the
+\texttt{relayd}, get the CTF data, turn them into binary C-types and send them
+to the Python consumer over a named Pipe. Then this consumer will transform them
+into Scribe messages and send them to the Scribe server. In case of a non-live
+tracing session, the CTF data will end up to the local disk. After the end of
+the session, using our Babeltrace plugins, will transform them again into Scribe
+messages and send them to Scribe.
+
+One important thing to mention is that, every communication arrow in Figure
+\ref{fig:blkin-internal.png} is a TCP connection. This, in conjunction with the
+Scribe characteristics, gives us the ability for a variety of BlkKin deployments
+within the instrumented cluster. For example we can have multiple relayds and a
+single Scribe server. However, as it is going to be clarified in the Evaluation
+Section \ref{}, the most appropriate and even suggested by Twitter deployment is
+the one illustrated in Figure \ref{fig:blkin-overall.png}.  In this deployment,
+there is a whole BlkKin stack running on each cluster node, where the
+instrumented application runs. This includes a local Scribe daemon as well. This
+deployment enables us to take advantage of the Scribe batch messaging
+capability. All the CTF messages are send to relayd and Babeltrace over
+\texttt{localhost} which is faster and then end up to the local Scribe server.
+Scribe in optimized to batch messages or temporarily store them locally if the
+next Scribe server is unavailable. This lowers the network traffic and prevents
+us from data loss. Also, it enables us from changing the final data destination
+(Zipkin or HDFS) simply by changing the XML file from which each local Scribe
+daemon gets configured. 
