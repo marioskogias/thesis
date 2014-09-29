@@ -60,13 +60,45 @@ the LTTng case, the \texttt{record()} function makes LTTng \texttt{tracepoint()}
 calls. These calls are predefined in a header file. This header file is used by
 LTTng to create the methods bodies and the object file which is finally linked
 to the final BlkKin object file, which in turn is linked with the instrumented
-application. The LTTng header file used to create the tracepoint is BlkKin can
-be found in Listing \ref{lst:zipkin_trace.h}. In this proof-of-concept version
+application. In Listing \ref{lst:zipkin_trace.h} you can see how we defined the
+tracepoint for the key-value annotations. In this proof-of-concept version
 of BlkKin, all the tracepoints are considered WARNINGS, and the severity level
 configured is such, so that all of them are eventually logged. To avoid
 repetition, in the Listing only the key-value tracepoint is illustrated. The
 timestamp tracepoint is the same, but instead of key-value information, we have
 the event name.
 
-
 \ccode{BlkKin tracepoints}{zipkin_trace.h}
+
+As far as the sampling is concerned, in order not to trace all the requests, one
+has to export an environmental variable called \texttt{RATE}. This variable is
+an integer N which indicates that 1/N calls to \texttt{blkin\_init\_new\_trace}
+should actually create a new trace. This way we can regulate the amount of
+traces we produce.
+
+So, the BlkKin library provides a header file to be included in the source code
+and a dynamically linked object file to be linked with the application. This dll
+includes all the necessary LTTng functions as well. However, as we described in
+Section \ref{sec:user-tracing}, normally the LTTng threads are created whenever
+the dll is loaded. This would cause problems for applications that fork(),
+because the child would not have its own LTTng threads to trace. So, instead, we
+used \texttt{dlopen} \texttt{dlsym} and manually load the BlkKin functions which
+in turn load the LTTng object file and create the needed threads whenever the
+function \texttt{blkin\_init()} is called.
+
+To sum up, we site an execution example in Listing \ref{lst:blkin-example.c} and
+its Makefile in Listing \ref{lst:Makefile}.
+
+\ccode{BlkKin example Makefile}{Makefile}
+\ccode{BlkKin execution example}{blkin-example.c}
+
+\section{Babeltrace plugins implementation}
+
+In this section we will describe how we implemented the Babeltrace plugins that
+convert CTF data to Scribe messages and send them to the Scribe server. As
+mentioned, we implemented two different plugins one generic that sends JSON data
+to Scribe and one Zipkin specific that creates Scribe messages that end up to
+Zipkin. Since Scribe messages are simple strings after all, both plugins share a
+common core that handles with the connections and message transportation. Each
+plugin implements a different message formation part which results to a string
+message to be sent to Scribe.
