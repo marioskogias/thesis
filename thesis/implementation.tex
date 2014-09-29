@@ -1,0 +1,72 @@
+\chapter{BlkKin Implementation}\label{ch:implementation}
+
+In the previous chapter, we discussed how BlkKin was design to fulfil all the
+needed prerequisites. In this chapter, we will present how we implemented the
+BlkKin's interconnecting parts and the parts needed to use BlkKin and subtract
+useful information. There also included code snippets that clarify the
+implementation.
+
+\section{Instrumentation Library}\label{sec:library}
+As mentioned, we needed to implement a library in C/C++ that encapsulates the
+tracing semantics mentioned in Dapper. This API should give programmers the
+ability to perform any kind of tracing operation or correlation they want. Since
+Zipkin was designed for distributed Web services, the existing, equivalent
+Zipkin libraries for other languages, make use of HTTP headers in order to
+transport the correlating information. In fact, there are three distinct HTTP
+headers that travel along with the HTTP requests and used for tracing. These
+headers are \texttt{X-B3-TraceId}, \texttt{X-B3-SpanId} and
+\texttt{X-B3-ParentSpanId}. In our case, we have C/C++ applications
+communicating, so instead of these HTTP headers, we created the equivalent
+C-struct which includes the same information. This struct is the one in
+Listing \ref{lst:blkin-info.h}.
+
+\ccode{BlkKin basic struct}{blkin-info.h}
+\ccode{BlkKin trace struct}{blkin-trace.h}
+
+The above struct is exchanged between the different software layers and used for
+tracing their correlations.
+
+According to Zipkin, in order to create a trace, you also need an
+\texttt{Endpoint} and a name for the trace. So, when an application receives or
+creates a new \texttt{struct blkin\_trace\_info}, it also creates a
+\texttt{blkin\_trace} as seen in Listing \ref{lst:blkin-trace.h} and then moves
+on to the other library operations. 
+
+After the above structs creation, the instrumented application could either
+create annotations (Listing \ref{lst:blkin-record.h}), or create a
+\textit{child} (Listing \ref{lst:blkin-child.h}) of the current span. We have to
+mentioned that there is also a C++ wrapper for these function calls, but is
+omitted since it shares exactly the same logic but implemented in an
+object-oriented way.
+
+\cccode{BlkKin child actions}{blkin-child.h}
+\cccode{BlkKin annotations}{blkin-record.h}
+
+All these mentioned structs include ids which are supposed to be unique not only
+per computer node, but per cluster as well, since we plan to implement
+distributed tracing. For our implementation, these ids are \texttt{uint\_64}
+numbers that are randomly generated. In order to have a simple implementation,
+we use \texttt{rand()}. However, the normal procedure to feed it with the
+current timestamp failed for us, since we has multiple processes starting almost
+simultaneously on the same host and this resulted in all these services taking
+the same feed and producing the same ids. Instead, we feed \texttt{srand()} by
+reading from \texttt{\textbackslash dev\textbackslash urandom}.
+
+After having defined the above API, we had to provide an implementation which is
+going to be based on LTTng. LTTng is activated only whenever the fucntion
+\texttt{record} is called. So, someone could keep the rest of the library and
+implement a custom tracing backend only by changing this function. Concerning
+the LTTng case, the \texttt{record()} function makes LTTng \texttt{tracepoint()}
+calls. These calls are predefined in a header file. This header file is used by
+LTTng to create the methods bodies and the object file which is finally linked
+to the final BlkKin object file, which in turn is linked with the instrumented
+application. The LTTng header file used to create the tracepoint is BlkKin can
+be found in Listing \ref{lst:zipkin_trace.h}. In this proof-of-concept version
+of BlkKin, all the tracepoints are considered WARNINGS, and the severity level
+configured is such, so that all of them are eventually logged. To avoid
+repetition, in the Listing only the key-value tracepoint is illustrated. The
+timestamp tracepoint is the same, but instead of key-value information, we have
+the event name.
+
+
+\ccode{BlkKin tracepoints}{zipkin_trace.h}

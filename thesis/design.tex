@@ -123,9 +123,13 @@ enables us to trace both kernel and user-space applications with the same
 infrastructure. Since LTTng uses tracepoints inserted in the source code, by
 using it we can deploy any tracing logic we want. In our case, we had decided
 beforehand to use an annotation-based logic through the Dapper semantics, custom
-instrumentation was exactly what we needed. Finally, LTTng has live tracing
+instrumentation was exactly what we needed. Also, LTTng has live tracing
 support, which could make use of. So, instantly another prerequisite was
-covered.
+covered. Finally, like Syslog, LTTng implements different severity levels,
+namely a tracepoint can be considered emergency or waring for example. So, this
+enabled us to create different tracepoint with different severity levels and in
+case of live monitoring enable only the most basic ones, while in case of
+extensive tracing all tracepoints should be logged.
 
 \section{BlkKin contribution}\label{sec:contribution}
 

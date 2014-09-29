@@ -29,7 +29,8 @@
 \usepackage{listings}
 \usepackage{paralist}
 \usepackage{ulem}
-
+\usepackage{tocvsec2}
+\usepackage[toc,page]{appendix}
 % FONT SETTINGS ===============================================================
 
 %\setromanfont[Mapping=tex-text]{CMU Serif}
@@ -227,6 +228,10 @@
 	\lstinputlisting[float=h!, style=c, caption={#1}, label=lst:#2]{src/#2}
 }
 
+\newcommand\cccode[2]{
+	\lstinputlisting[style=c, caption={#1}, label=lst:#2]{src/#2}
+}
+
 \newcommand\haskellcode[3]{
 	\lstinputlisting[style=haskell, caption={#1}, label=lst:#2]{src/#3}
 }
@@ -307,13 +312,15 @@
 \include{lttng}
 \include{tracing-theory}
 \include{design}
+\include{implementation}
+\include{evaluation}
+\include{conclusion}
 \backmatter
 \cleardoublepage % start at the next odd page
 \phantomsection % correct hyperlinking
 \bibliography{references}
 \bibliographystyle{plain}
 % \include{glossary}
-% \chapter{Appendix}
 % \printindex
 
 \end{document}
