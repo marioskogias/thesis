@@ -41,10 +41,11 @@ overview of the system's performance per specific layer.
 
 In the following sections we will step by step examine BlkKin. Specifically, in
 Section \ref{sec:rationale} we will describe the rationale behind Blkin, while
-Section \ref{sec:components} goes through BlkKin's components. Finally, in
-Section \ref{sec:flow} we illustrate the resulting BlkKin architecture and the
-flow of an IO request from the time created in the storage infrastructure until
-it ends up handled by BlkKin and stored.
+Section \ref{sec:components} goes through BlkKin's building blocks and Section
+\ref{sec:contribution} analyzises the BlkKin contributions. Finally, in Section
+\ref{sec:flow} we illustrate the resulting BlkKin architecture and the flow of a
+traced request from the time created in the instrumented infrastructure until it
+ends up handled by BlkKin and stored.
 
 \section{Design rational}\label{sec:rationale}
 
@@ -76,7 +77,8 @@ where information is finally kept.
 The aggregated information should be available through a Web user-interface that
 depicts the correlation between the systems' distinct software layers. Through
 that interface the user should be able to locate the information he wants and
-make basic queries.
+make basic queries. Also, this interface should be able to be used as a
+monitoring and alerting tool in case something misoperates.
 
 \end{description}
 
@@ -125,15 +127,16 @@ instrumentation was exactly what we needed. Finally, LTTng has live tracing
 support, which could make use of. So, instantly another prerequisite was
 covered.
 
-\section{BlkKin contribution}
+\section{BlkKin contribution}\label{sec:contribution}
 
 At that point, after having decided about the different building blocks that
 BlkKin would use, we had to find a way to make them communicate. In this section
 we will explain how we made the above systems communicating with each other in
-order to created a unified tracing infrastructure. This contribution is returned
-to the open-source community and the major part was created during my
-participation in the Google Summer of Code 2014 in the LTTng project, under the
-supervision of Jeremie Galarneau.
+order to created a unified tracing infrastructure and what we needed to add in
+order to complete BlkKin as an end-to-end, unified tracing infrastructure. This
+contribution is returned back to the open-source community and the major part
+was created during my participation in the Google Summer of Code 2014 in the
+LTTng project, under the supervision of Jeremie Galarneau.
 
 \subsection{BlkKin library}
 Since we had decided on the tracing infrastructure, we had to find a way to
@@ -189,6 +192,19 @@ solution, LTTng is obliged to log only specific tracepoints. After that,
 Babeltrace sends these data to a Python consumer communicating over a named
 Pipe. Implementation details are further explained in Section \ref{}.
 
+\subsection{BlkKin Monitoring UI}
+Although Zipkin's UI was adequate for investigating the correlations between the
+different storage layers, it didn't cover our needs as an alerting tool. So, we
+developed a simple Python-django\footnote{https://www.djangoproject.com/}
+application, what communicates with the Zipkin database. This application is
+responsible to gather particular metrics, mostly average values, such as the
+average network communication over the last 10 minutes, and present them
+accordingly. This application includes thresholds for these metrics. If the
+values are under the thresholds the UI shows them green, but when the metrics
+are over the threshold values, they are illustrated red. These threshold values
+are the result from elaborate data analysis over a wide series of data in the
+HDFS.
+
 \section{BlkKin architecture and data flow}\label{sec:flow}
 
 In this section we present the overall BlkKin architecture and data flow. As we
@@ -208,13 +224,15 @@ tracing session, the CTF data will end up to the local disk. After the end of
 the session, using our Babeltrace plugins, will transform them again into Scribe
 messages and send them to Scribe.
 
+\diagram{BlkKin Internal Communication}{blkin-internal.png}
+
 One important thing to mention is that, every communication arrow in Figure
 \ref{fig:blkin-internal.png} is a TCP connection. This, in conjunction with the
 Scribe characteristics, gives us the ability for a variety of BlkKin deployments
 within the instrumented cluster. For example we can have multiple relayds and a
 single Scribe server. However, as it is going to be clarified in the Evaluation
 Section \ref{}, the most appropriate and even suggested by Twitter deployment is
-the one illustrated in Figure \ref{fig:blkin-overall.png}.  In this deployment,
+the one illustrated in Figure \ref{fig:blkin-deploy.png}.  In this deployment,
 there is a whole BlkKin stack running on each cluster node, where the
 instrumented application runs. This includes a local Scribe daemon as well. This
 deployment enables us to take advantage of the Scribe batch messaging
@@ -225,3 +243,5 @@ next Scribe server is unavailable. This lowers the network traffic and prevents
 us from data loss. Also, it enables us from changing the final data destination
 (Zipkin or HDFS) simply by changing the XML file from which each local Scribe
 daemon gets configured. 
+
+\diagram{BlkKin Deployment}{blkin-deploy.png}
