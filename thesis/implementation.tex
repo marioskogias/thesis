@@ -97,8 +97,22 @@ its Makefile in Listing \ref{lst:Makefile}.
 In this section we will describe how we implemented the Babeltrace plugins that
 convert CTF data to Scribe messages and send them to the Scribe server. As
 mentioned, we implemented two different plugins one generic that sends JSON data
-to Scribe and one Zipkin specific that creates Scribe messages that end up to
+to Scribe and one Zipkin-specific that creates Scribe messages that end up to
 Zipkin. Since Scribe messages are simple strings after all, both plugins share a
 common core that handles with the connections and message transportation. Each
 plugin implements a different message formation part which results to a string
 message to be sent to Scribe.
+
+First we will explain how we extract the tracing information. Babeltrace exposes
+a Python library which is created using swig2.0\footnote{http://www.swig.org/}.
+According to this library, in order to read the CTF data you have to create a
+\texttt{Tracecollection} object and call the method \texttt{add\_trace} on it
+passing the trace path. After that, a Python generator is created in
+\texttt{Tracecollection.events}. If we iterate over that generator, we can take
+the CTF event trace information formated as a Python object which has some
+properties like the event name and the timestamp and another generator that
+returns the event information, namely the values passed to the
+\texttt{tracepoint} function call.  After that we can manipulate the data the
+way we want.
+
+The case of the JSON format is easy since after that we 
