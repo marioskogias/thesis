@@ -103,16 +103,124 @@ common core that handles with the connections and message transportation. Each
 plugin implements a different message formation part which results to a string
 message to be sent to Scribe.
 
-First we will explain how we extract the tracing information. Babeltrace exposes
-a Python library which is created using swig2.0\footnote{http://www.swig.org/}.
-According to this library, in order to read the CTF data you have to create a
-\texttt{Tracecollection} object and call the method \texttt{add\_trace} on it
-passing the trace path. After that, a Python generator is created in
-\texttt{Tracecollection.events}. If we iterate over that generator, we can take
-the CTF event trace information formated as a Python object which has some
-properties like the event name and the timestamp and another generator that
-returns the event information, namely the values passed to the
-\texttt{tracepoint} function call.  After that we can manipulate the data the
-way we want.
+First we will explain how we extract the tracing information. Babeltrace
+exposes a Python library which is created using
+swig2.0\footnote{http://www.swig.org/}.  According to this library, in order to
+read the CTF data you have to create a \texttt{Tracecollection} object and call
+the method \texttt{add\_trace} on it passing the trace path. After that, a
+Python generator is created in \texttt{Tracecollection.events}. If we iterate
+over that generator, we can take the CTF event trace information formated as a
+Python object which has properties like the event name and the timestamp and
+another generator that returns the event information in the form of a tuple
+(item-name, item-value), namely the values passed to the \texttt{tracepoint}
+function call. After that we can manipulate the data the way we want.
 
-The case of the JSON format is easy since after that we 
+The case of the JSON format is easy since after that we can easily create a
+Python dictionary and transform it into a JSON object which is ready to be
+forwarded to Scribe as it is already a string. On the other hand, in order to
+feed data to Zipkin the procedure is different. As mentioned in Section
+\ref{sec:zipkin}, Zipkin makes use of Thrift as well in order to create a binary
+representation of the events and the Thrift file used can be found in Listing
+\ref{lst:zipkin.thrift}. So, in order to create these messages, we used Thrift
+to create the Python code from the Zipkin Thrift file. Thrift created the Python
+classes needed. So, when obtained the tracing information with the method
+mentioned above, we passed them to the classes constructors and created the
+equivalent \texttt{Span}, \texttt{Annotation} and \texttt{Endpoint} objects.
+After that each span is encoded using the Thrift \texttt{TBinaryProtocol} and
+this value, in order to become a string, is base64 encoded. After this
+procedure, we have the final string to forward to Scribe.
+
+After having formatted the messages, we have to send them to Scribe. To do that
+we used the Python module \texttt{facebook-scribe} from \texttt{pip}. Sending a
+message to Scribe is as simple as it seen in Listing \ref{lst:scribe.py}.
+
+\pcode{Scribe messaging}{scribe.py}
+
+In case we want to annotate on a subsystem that does not have distinct beginning
+and end, Zipkin provides some special annotations that are used to start and end
+a span. They are used only for instrumentation and visualization purposes.
+However, using these annotations annotations we can be sure that a span has
+ended and then forward a packed message to Scribe, namely a message that
+includes multiple annotations. This reduces the number of messages and
+consequently the network traffic and the server load. Depending on the
+instrumentation this may not be possible when having a span that collects
+annotations from multiple computer nodes in cases of distributed traces. So, the
+Zipkin plugin has the option to collect annotations, temporarily stored them in
+a dictionary using as a key the trace and span id pair and when a predefined
+annotation is asked to be logged then create a message including all the
+annotations for this specific span. In case this is not possible, the plugin
+just creates single-annotation messages and forwards them to Scribe.
+
+\section{BlkKin Live tracing}
+Although, as already mentioned, the solution we gave for live tracing is only
+termporary since Babeltrace is under code refactoring at this specific moment
+and after this the above plugins will operate with the live tracing as well, for
+completion reasons, in this section we explain how we implemented live tracing
+for BlkKin.
+
+Babeltrace is a CTF-to-text converter written in C. Instead of text we wanted to
+produce Scribe messages. So, at first we tried to implement this functionality
+within Babeltrace. For this reason we needed to implement a Scribe client
+written in C. Although we created a working prototype of Babeltrace sending
+messages to Scribe, this idea was abandoned after the urge of my GSoC mentor and
+started working with the plugins. Although we could redirect Babeltrace output
+to a process that would create the Scribe messages, we chose to avoid this
+CTF-to-text and text-to-Scribe conversion. Instead, we created a version of
+Babeltrace especially for BlkKin. This version instead of reading generic
+CTF-events is aware of the events' content as described in
+\ref{lst:zipkin_trace.h}. Consequently, instead of iterating over the CTF trace
+for generic events, this version of Babeltrace extracts the included information
+and creates a C-struct with them as seen in Listing \ref{lst:babeltrace-live.h} 
+
+\ccode{Babeltrace live struct}{babeltrace-live.h}
+
+After that this struct is forwarded to a Unix pipe. On the other side of the
+pipe there is a Python process. This process makes use of Python
+ctypes\footnote{https://docs.python.org/2/library/ctypes.html}. So whenever a
+struct is read, a Python object is created and from that point the Python
+consumer reuses the Zipkin Babeltrace plugin code to create the equivalent Span,
+Annotation and Endpoint objects and finally send the base64-encoded message to
+Scribe.
+
+\section{BlkKin Endpoints}
+
+\subsection{BlkKin monitoring tool}
+As we mentioned in the design part, Zipkin covered a basic need for the user
+interface with its Web UI. However, this specific UI can be used mostly for
+trace visualization and not as a tool that can be used to detect abnormalities.
+Thus, we created a simple Python-django application. In this proof-of-concept
+implementation, this application communicates with the Zipkin databse which is a
+MySQL database. It queries the database for aggregate and average information
+that depict the cluster state over the last N minutes. After that either using a
+threshold for these values or judging on other criteria, it illustrates this
+information as green when everything is working properly, or red when there is a
+possible anomaly. There screenshots of this tool in the evaluation part
+(\ref{}).
+
+\subsection{Hadoop}
+Scribe can be configured to store the data it receives in HDFS. So, we used
+Hadoop 0.21.0 to store tracing data from BlkKin for further analysis. The
+usecase scenario includes extensive tracing (not real time) without sampling and
+post-processing the tracing data in order to locate the thresholds and metrics
+used in the BlkKin monitoring tool. After that BlkKin can use sampling and send
+data to Zipkin.
+
+In our described configuration, if we use the JSON Babeltrace plugin we end up
+having JSON data in the HDFS which can be manipulated easily with Map-Reduce
+jobs. However, if we use the Zipkin Babeltrace plugin, then in the HDFS we have
+multiple files containing base64 encoded strings. In order to extract the
+information wanted through Map-Reduce, we had to decode this information
+following the opposite direction. Again using Thrift and the Zipkin Thrift
+file we created the equivalent Java code which created the Annotation, Span and
+Endpoint classes in Java. Then after reading from HDFS, we base64 decoded the
+strings and then TBinaryProtocol decoded them. After that we could create the
+Span object. Since most of the data we wanted to extract where the duration
+between two specific annotations, we created a simple Java interface to help us.
+Whenever a Span with multiple annotations was read we had to define whether to
+keep the span or not and then to forward the annotation to the reducers or not.
+Then a key-value pair (id, timestamp) was emitted. The reducer's job was just to
+subtract the two different values belonging to the same id. This id is a string
+and its creation is also defined by the interface. The interface can be seen in
+Listing \ref{lst:interface.java} and its up to the user how to implement it.
+
+\ccode{Hadoop interface}{interface.java}
