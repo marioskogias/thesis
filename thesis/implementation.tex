@@ -70,6 +70,14 @@ the event name.
 
 \ccode{BlkKin tracepoints}{zipkin_trace.h}
 
+LTTng assigns a timestamp to every event it records, so in case of the
+timestamp events we do not need to care about timing information by calling
+\texttt{gettimeofday()} for example. Instead, LTTng makes use of
+\texttt{CLOCK\_MONOTONIC}, which is transformed to real timestamp during the
+reading process in Babeltrace. As part of the CTF metadata LTTng also sends the
+timestamp and the monotonic value from the time the session started, so that
+the real timestamp can be formed during reading.
+
 As far as the sampling is concerned, in order not to trace all the requests, one
 has to export an environmental variable called \texttt{RATE}. This variable is
 an integer N which indicates that 1/N calls to \texttt{blkin\_init\_new\_trace}

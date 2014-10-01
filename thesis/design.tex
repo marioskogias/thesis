@@ -131,6 +131,43 @@ enabled us to create different tracepoint with different severity levels and in
 case of live monitoring enable only the most basic ones, while in case of
 extensive tracing all tracepoints should be logged.
 
+Finally, since we design BlkKin to be a distributed tracing infrastructure, we
+should take special care about the time skews among the cluster node clocks.
+When tracing a single node, a single clock is used. However, distributed
+applications create challenges concerning clock synchronizations. If we do not
+care about clock synchronization, there is serious possibility to find a request
+reply virtually taking place before the request itself, because there is time
+skew between the sever and the client. Older approaches (\cite{hp}) used
+post-processing techniques in order to adjust the time skews. According to these
+techniques, each cluster node collected tracing information based on its local
+clock, while a specific cluster node is considered anchor. During the tracing
+session, periodically each host sends an echo message to the anchor, and the
+anchor replies with the sender's timestamp and the anchor's current timestamp.
+The sending host receives the reply and records a time measurement consisting of
+three timestamps: send, remote (i.e., anchor), and reply. Relying on the fact
+that the network communication time is the same for sending and replying, we can
+compute the time skew. After the end of the tracing session these timeskews are
+interpolate to create the each host's time-skew line throughout the tracing
+session. Theses skews are applied to the logged timestamps before the events end
+up to the database. These approaches performed quite well, but their major
+disadvantages were the post-processing overhead to calculate the skew, which
+could be significant in case of long tracing sessions, and the fact that
+live-tracing was impossible due to this needed post processing.
+
+However, when the previous methods were developed, NTPs performance was not
+acceptable for distributed tracing. According to \cite{hp} using NTP caused
+skews over 1000 $\mu$sec. In 2010 NTP version 4 was developed. According its
+RFC\footnote{http://tools.ietf.org/html/rfc5905} NTPv4 NTPv4 includes
+fundamental improvements in the mitigation and discipline algorithms that extend
+the potential accuracy to the tens of microseconds with modern workstations and
+fast LANs. After experimenting with NTPv4 performance and accuracy, we decided
+that it was adequate for our tracing needs, namely there was no response
+happening before its request, only after a few hours of NTP syncing. One
+deployment that we also tried without remarkably better result, was to use a
+cluster node as NTP server, since we care only about relative timestamps and not
+absolute. Thus, exploiting the fast LAN we waited to have better synchronization
+results, but we concluded that even a global NTP server operated well.
+
 \section{BlkKin contribution}\label{sec:contribution}
 
 At that point, after having decided about the different building blocks that

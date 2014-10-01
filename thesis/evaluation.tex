@@ -1,1 +1,100 @@
 \chapter{Evaluation}\label{ch:evaluation}
+
+In this section we will describe our experience from using BlkKin in a real
+usecase senario. The instrumented infrastructure is described in Section
+\ref{sec:infra}. After that, in Section \ref{sec:metrics} we analyse performance
+metrics concerning the network and system overhead that justify our design and
+deployment choices. Finally, in Section \ref{sec:failures} we explain how we
+used BlkKin to identify system faults which are virtually inserted by us, but
+reflect possible real failures or bottlenecks. 
+
+
+\section{Instrumented infrastructure}\label{sec:infra} As a use-case, we used
+BlkKin to instrument Archipelago and RADOS. These systems were examined in
+Sections \ref{sec:archip-bkg} and \ref{sec:rados} respectively. Archipelago is
+written is C and RADOS in C++. So we used the BlkKin library C++ wrapper for
+the RADOS instrumentation. Instead of using the \texttt{archip-bench} tool,
+which is part of Archipelago, to initiate IO requests, we instrumented the Qemu
+Archipelago driver. So, using Qemu we start a virtual machine which has an
+Archipelago drive and create different IO loads to this driver using
+\texttt{fio}\footnote{http://linux.die.net/man/1/fio}. Thus we can track the IO
+request from the time Qemu receives it until it is finally served by RADOS. 
+
+The Qemu Archipelago driver receives the IO requests from Qemu and creates XSEG
+requests for the VLMC. Qemu initiates the tracing information as well and
+Qemu spans are the root spans. After that, these tracing information is
+carried as part of the XSEG request. To do that, we needed to extend
+\texttt{libxseg}\footnote{https://github.com/grnet/libxseg} and add the
+tracing information needed as shown in Listing \ref{lst:blkin-info.h} nested in
+the XSEG request. So, as far as Archipelago in concerned, the tracing
+information is transmitted as part of the XSEG request. Each Archipelago peer
+is considered a different service, with a different endpoint that creates a
+single span per IO request in the general case. So, in the Zipkin UI we expect
+to see each peer represented as a single bar, whose length indicates the time
+this peer needed to serve this specific request.
+
+Unlike Archipelago where the instrumentation was obvious, instrumenting RADOS
+was more challenging. RADOS exposes a C-API (librados) which is used in the
+Archipelago rados-peer. So, the first thing we did was to instrument the read
+and write calls of this API. Then, we needed to extend the RADOS classes to
+transfer the tracing information. In a nutshell, after librados, Ceph protocol
+which is TCP-based transfers the IO request to the cluster. So, the tracing
+information is encoded as part of the \texttt{MOSDOp} Ceph object. Then the
+request after being decoded, enters a dispatch queue and waits to be served.
+Based on the objects affected, a different placement group handles it. After the
+dispatch queue, the request is handled by this pg's primary OSD and then based
+on the replication factor, equal number of replication operations are issued
+that follow the same route. Request handling includes journal access and
+filestore access. In an attempt not to expose much of the RADOS internals, so
+that the Zipkin UI would be self-explanatory even for someone that is not
+familiar with the RADOS code architecture, we tried to instrument the code so
+that we can extract information such as the time spent in the dispatch queue,
+the network communication time, or the journaling duration and at the same time
+we follow the causal relations used by Zipkin. For example, the IO handling by
+the primary OSD causes the replication operations. So the replication ops are
+children spans.
+
+As far as the test-bed is concerned, we used two physical nodes LAN
+interconnected, and set up two OSDs on each node. On one of this nodes we
+installed Archipelago and Qemu. So, on the one node we had the running VM,
+Archipelago and 2 OSDs and on the other just two OSDs. You can find some specs
+regarding the hardware and software infrastructure in Tables
+\ref{tab:hardware-specs} and \ref{tab:software-specs}. 
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{ | l | l | }
+        \hline
+        Component & Description \\ \hline \hline
+        CPU &  2 x Intel(R) Xeon(R) CPU E5645 @ 2.40GHz \cite{e5645} \\
+         & Each CPU has six cores with Hyper-Threading enabled, which equals to 
+         24 threads. \\ \hline
+        RAΜ & 2 banks x 6 DIMMs PC3-10600 \\
+        & Peak transfer rate: 10660 MB/s \\ \hline
+        Hard disks & 12x 7.2k RPM 2TB SAS HDs, 12x 7.2k RPM 600GB SAS HDs, 6x \\
+        & 100GB SSD SATA HDs \\ \hline
+    \end{tabular}
+    \caption{Test-bed hardware specs}
+    \label{tab:hardware-specs}
+\end{table}
+
+The Ceph OSDs on the one node used two SSD disks in RAID 0, one each, and the
+other two on the other node two SAS disks in RAID 0, one each.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{ | l | l | }
+        \hline
+        Software & Version \\ \hline \hline
+        OS &  Debian Wheezy \\ \hline
+        Linux kernel & 3.2.0-4 \\ \hline
+        lttng-tools & 2.4 \\ \hline
+    \end{tabular}
+    \caption{Test-bed software specs}
+    \label{tab:software-specs}
+\end{table}
+
+\section{Evaluation
+metrics}\label{sec:metrics}
+
+\section{Detecting failures}\label{sec:failures} 
