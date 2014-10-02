@@ -41,24 +41,31 @@ transfer the tracing information. In a nutshell, after librados, Ceph protocol
 which is TCP-based transfers the IO request to the cluster. So, the tracing
 information is encoded as part of the \texttt{MOSDOp} Ceph object. Then the
 request after being decoded, enters a dispatch queue and waits to be served.
-Based on the objects affected, a different placement group handles it. After the
-dispatch queue, the request is handled by this pg's primary OSD and then based
-on the replication factor, equal number of replication operations are issued
-that follow the same route. Request handling includes journal access and
+Based on the objects affected, a different placement group handles it. After
+the dispatch queue, the request is handled by this pg's primary OSD and then
+based on the replication factor, equal number of replication operations are
+issued that follow the same route. Request handling includes journal access and
 filestore access. In an attempt not to expose much of the RADOS internals, so
 that the Zipkin UI would be self-explanatory even for someone that is not
 familiar with the RADOS code architecture, we tried to instrument the code so
 that we can extract information such as the time spent in the dispatch queue,
 the network communication time, or the journaling duration and at the same time
 we follow the causal relations used by Zipkin. For example, the IO handling by
-the primary OSD causes the replication operations. So the replication ops are
-children spans.
+the primary OSD causes the replication operations. So the replication
+operations are children spans.
 
 As far as the test-bed is concerned, we used two physical nodes LAN
 interconnected, and set up two OSDs on each node. On one of this nodes we
 installed Archipelago and Qemu. So, on the one node we had the running VM,
-Archipelago and 2 OSDs and on the other just two OSDs. You can find some specs
-regarding the hardware and software infrastructure in Tables
+Archipelago and 2 OSDs and on the other just two OSDs. Each node had a whole
+BlkKin stack running and a local Scribe server. Each Scribe server communicated
+with the central Zipkin collector or the Scribe server logging to the Hadoop
+cluster. For Zipkin we used a 4-core. 8-gb RAM virtual machine, while for the
+Hadoop cluster, as it was used only as a proof of concept, we used 2 2-core,
+4-gb virtual machines. 
+
+You can find some specs regarding the hardware and software infrastructure in
+Tables
 \ref{tab:hardware-specs} and \ref{tab:software-specs}. 
 
 \begin{table}[H]
@@ -94,7 +101,77 @@ other two on the other node two SAS disks in RAID 0, one each.
     \label{tab:software-specs}
 \end{table}
 
-\section{Evaluation
-metrics}\label{sec:metrics}
+\section{Evaluation metrics}\label{sec:metrics}
 
-\section{Detecting failures}\label{sec:failures} 
+In this section we analyze some metrics concerning the network and the system
+overhead that BlkKin poses to the system. These metrics led us to the previous
+deployment architecture.
+
+\subsection{Thrift vs JSON format}
+As we mentioned we created two similar Babeltrace plugins, one sending JSON
+formatted messages and the other Thrift encoded messages to Scribe. It worths
+measuring the message size in these two cases because the smaller the message
+the lower the network overhead.
+In order to evaluate this parameter we created a simple BlkKin message and send
+it to a Scribe server both with the JSON and the Zipkin plugin. The message was
+as simple as seen in Listing \ref{lst:message.json}
+
+\ccode{A simple JSON formatted message}{message.json}
+
+The packet size of the Zipkin-Thrift-encoded and the JSON encoded messages sent
+to Scribe can be seen in Table \ref{tab:payloads}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{ | l | l | }
+        \hline
+        Protocol & Packet size in bytes \\ \hline \hline
+        Thrift & 246 \\ \hline
+        JSON  & 316 \\ \hline
+    \end{tabular}
+    \caption{Packet sizes per protocol used}
+    \label{tab:payloads}
+\end{table}
+
+As it was expected, the Thrift message is much smaller that the JSON one even in
+this case that the service and event names are small.
+
+\subsection{Scribe vs relayd}
+Another comparison we need to make to decide on the deployment architecture is
+the network overhead created by Scribe and relayd. For example, instead of
+running a local Scribe server, we could run a central realyd server per cluster
+and then send the data to the central Scribe server.  Scribe, as mentioned
+offers buffering and batch messaging. Also, the LTTng consumerd will be faster
+when writing to localhost rather than to a remote server, thus reducing the
+possibility to lose tracing information. However, we have to figure out the
+amount of network traffic produced in the two cases. To evaluate this, we
+created 10 simple messages as the previous ones and sent them to a local relayd
+and then they were forward using Babeltrace live to the Scribe server. We
+measured the network traffic to localhost and to the Scribe server.
+
+Our first notice when using \texttt{tcpdump} on localhost is that relayd polls
+consumerd on a specific interval to find out if there are any new data
+available. So, we wouldn't like to have our cluster being flooded by polling
+messages. Concerning the tracing data themselves, excluding polling, the sums of
+all the TCP packets' payloads sent for the 10 messages mentioned, can be found
+in Table \ref{tab:relayd-scribe} for each daemon.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{ | l | l | }
+        \hline
+        Daemon & Data size in bytes \\ \hline \hline
+        Scribe & 1974 \\ \hline
+        relayd  & 1079 \\ \hline
+    \end{tabular}
+    \caption{Data sent for 10 Scribe messages}
+    \label{tab:relayd-scribe}
+\end{table}
+
+However, even if CTF-format is more compact that Thrift, we prefer to avoid the
+polling messages in the cluster LAN and restrict them to localhost and to make
+use of the Scribe batch messaging capability in favor of the less payload size
+that CTF has to offer.
+
+\subsection{System overhead}
+\section{Using BlkKin to detect failures}\label{sec:failures}
