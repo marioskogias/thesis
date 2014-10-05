@@ -152,6 +152,15 @@
 	\end{figure}
 }
 
+\newcommand\diagramscale[3]{
+	\begin{figure}[h!]
+		\centering
+		\includegraphics[scale={#3}]
+		{diagrams/#2}
+		\caption{#1}
+		\label{fig:#2}
+	\end{figure}
+}
 \newcommand\diagramstrict[2]{
 	\begin{figure}[H]
 		\centering
@@ -232,6 +241,9 @@
 	\lstinputlisting[float=h!, language=Python, caption={#1},label=lst:#2]{src/#2}
 }
 
+\newcommand\bcode[2]{
+	\lstinputlisting[float=h!, language=bash, caption={#1},label=lst:#2]{src/#2}
+}
 \newcommand\cccode[2]{
 	\lstinputlisting[style=c, caption={#1}, label=lst:#2]{src/#2}
 }

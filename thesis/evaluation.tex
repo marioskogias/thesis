@@ -101,11 +101,67 @@ other two on the other node two SAS disks in RAID 0, one each.
     \label{tab:software-specs}
 \end{table}
 
+\section{BlkKin tracing environment}
+In order to set up the tracing environment, apart from the central Scribe
+collector which could be either the Zipkin collector or a Scribe server
+connected to HDFS, on each cluster node you have to follow the next steps to
+live trace:
+
+\begin{enumerate}
+\item Start the local Scribe daemon \\ 
+    The local Scribe daemon is configured to send the received messages to the
+    next Scribe server. In case of connection loss or congestion, the data are
+    stored locally and forward when the problem is solved.
+
+\item Start LTTng live tracing \\
+    Create a live tracing session and enable all the userspace events for it.
+    Then start Babeltrace live and redirect its output to a named pipe.
+
+\item Start the consumer \\
+    Start the python consumer that reads from the named pipe and send data to
+    the local Scribe server.  
+\end{enumerate}
+
+The overall procedure can be seen in Listing \ref{lst:start.sh}
+\bcode{Setting up the tracing environment}{start.sh}
 \section{Evaluation metrics}\label{sec:metrics}
 
 In this section we analyze some metrics concerning the network and the system
 overhead that BlkKin poses to the system. These metrics led us to the previous
 deployment architecture.
+
+\subsection{LTTng vs Syslog}
+First of all, we should evaluate the use of LTTng versus another logging system
+that is based on system calls every time some information needs to be logged.
+SystemTap, DTrace or even syslog make a system call or a stop at a break point
+whenever they need to trace something. This is claimed to have high overhead for
+a system that need to run in full load. As mentioned the BlkKin library was
+backend independent, so we we changed the LTTng backend for a syslog backend and
+instrumented a simple client server application with the BlkKin library. Then we
+measured the time eacg backend took to finish tracing. The application was a
+simple two-process application, that communicated over a UNIX pipe. The server
+created a root span, annotated and then passed a message to the client including
+tracing information. The client created a child span annotated and answered
+back. A single iteration triggers four annotations and we repeated this message
+passing for 10000 times. The results can be seen in Table
+\ref{tab:lttng-syslog}. 
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{ | l | l | }
+        \hline
+        Backend & Time for 10000 iterations \\ \hline \hline
+        LTTng &  1.8 sec \\ \hline
+        Syslog & 3.38 sec \\ \hline
+    \end{tabular}
+    \caption{LTTng vs Syslog comparison}
+    \label{tab:lttng-syslog}
+\end{table}
+
+As it was expected the syslog backend was about 90\% slower than LTTng even for
+this single example. So LTTng was the only choice possible that combined the
+low-overhead capability with the variety of tracing options such as user/kernel
+space tracing and performance counter access.
 
 \subsection{Thrift vs JSON format}
 As we mentioned we created two similar Babeltrace plugins, one sending JSON
@@ -174,4 +230,140 @@ use of the Scribe batch messaging capability in favor of the less payload size
 that CTF has to offer.
 
 \subsection{System overhead}
-\section{Using BlkKin to detect failures}\label{sec:failures}
+In this subsection we evaluate the overhead that BlkKin poses to the
+instrumented application. To do so, we created two different but typical IO
+loads using fio. The first one was 2GB of random 4Kb writes and the second was
+2GB of 64Kb sequential writes. These loads are diverse but really common and
+help up evaluate our systems performance under different working conditions.
+So, we ran fio in the virtual machine towards the Archipelago volume and
+measured the bandwidth the system had under different conditions. The scenarios
+we chose was without instrumentation, live tracing without sampling, live
+tracing with 1/500 sampling and tracing without live support. The results can
+be seen in Listings \ref{fig:4.png} and \ref{fig:64.png} and Tables
+\ref{tab:4k-random} and \ref{tab:64k-sequential} respectively.
+
+\diagramscale{Performance overhead for 4k random writes}{4.png}{0.82}
+\diagramscale{Performance overhead for 64k sequential writes}{64.png}{0.82}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{ | l | l | }
+        \hline
+        Scenario  & Bandwidth in Kbytes/sec  \\ \hline \hline
+        no tracing & 16887  \\ \hline
+        stopped tracing & 16076 \\ \hline
+        normal tracing & 14882  \\ \hline
+        live tracing & 14941  \\ \hline
+        live tracing sampling 500 & 15480  \\ \hline
+    \end{tabular}
+    \caption{Bandwidth for 64Kb sequential writes}
+    \label{tab:64k-sequential}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{ | l | l | }
+        \hline
+        Scenario  & Bandwidth in Kbytes/sec  \\ \hline \hline
+        no tracing & 1326.7  \\ \hline
+        stopped tracing & 1247.1 \\ \hline
+        normal tracing & 1100 \\ \hline
+        live tracing & 1107.8  \\ \hline
+        live tracing sampling 500 & 11927  \\ \hline
+    \end{tabular}
+    \caption{Bandwidth for 4Kb random writes}
+    \label{tab:4k-random}
+\end{table}
+
+Although the above figures depict different loads and working conditions, BlkKin
+performs in a similar way. We can see that when tracing is disabled, we have
+about 5\% bandwidth degradation. This degradation is caused by the check whether
+LTTng should trace or not. In case of full tracing the performance degradation
+increases at about 12\% in case of sequential writes and at about 17\% in case
+of small, random writes. This degradation is caused by the tracepoint function
+calls that actually log the information. The case of 4Kb writes is more affected
+because we have more IO request taking place fast one after the other. So the
+LTTng load is greater. Both live tracing without sampling and normal tracing
+affect the system in a similar way. The only change as far as LTTng is concerned
+is that in case if live tracing the consumerd writes the tracing information to
+a TCP socket instead of a local file descriptor. Finally, as we see in the
+scenario of sampled tracing, the degradation is such that we can afford tracing
+our system in production scale. In our scenario, we chose to sample 1/500 IO
+requests. Depending on the system load, this sampling rate can be either reduced
+or increased. It should be mentioned that in our instrumentation we used 113
+annotations per single IO request in order to track its whole route. So, the
+case of so-sampling, live tracing produced a significant amount of network
+traffic and should be avoided not only because of this traffic, but also because
+of it, the tracing information take more time to reach to Zipkin. Consequently,
+we will need more time to detect a possible failure or problem.
+
+\section{Using BlkKin to detect bottlenecks and failures}\label{sec:failures}
+
+As it has become obvious, BlkKin can be used for various reasons and trying to
+detect different problems either as part of the debugging process or as part of
+a fault detection mechanism. In this subjection we evaluate both of these uses.
+
+\subsection{Using Zipkin in debugging and system evaluation}
+The most simple use of BlkKin is to analyze the system's performance, measure
+the communication latencies, possible computation bottlenecks and generally to
+get a general overview of the request's evolution.  For these reasons, the
+Zipkin UI is really usefull. This UI enables us to do simple queries and to
+understand the causal relations, to evaluate the time differences between the
+different software layers and to access the key-value annotations or even make
+queries based on them.
+
+
+As seen in Figure \ref{fig:zipkin-overview.png} each span is represented as a
+separate bar whose length is commensurate to the duration of this specific
+processing phase. As far as time is concerned, each request is considered to
+start at time 0 and all timestamp annotations have timestamps relative to the
+first annotation of the trace. Also, if you click on a span that you are
+interested about, you can access this span's annotations as can be seen in
+Figure \ref{fig:zipkin-annotations.png}. In this screenshot we chose to
+investigate an `OSD Handling op', namely the span that annotates the OSD's
+actions to serve and IO request. At the top we can see each timestamp annotation
+with its relative time, while at the bottom we can see the key-value
+annotations. For example, this operation handling refers to the specific RADOS
+object whose name can be seen as part of the binary annotation.
+
+\diagram{Zipkin UI overview}{zipkin-overview.png}
+\diagram{Zipkin UI Annotations view}{zipkin-annotations.png}
+
+During this thesis evolution, Zipkin changed its UI. The old UI offered another
+visualizing capability that is planned to be added to the new UI soon. This
+capability was about endpoint dependencies. As it is seen in Figire
+\ref{fig:zipkin-depend.png}, each service is depicted as a different circle
+whose radius is commensurate to the processing duration of that specific phase.
+This d3 visualization depicts exactly the information flow.
+
+\diagram{Zipkin UI Dependencies View}{zipkin-depend.png}
+
+In case that these visual representations are not enough and we want to extract
+aggregate values, such as average values we have other choices. As mentioned
+Twitter suggest to deploy Zipkin with Cassandra. However, we deployed Zipkin
+using MySQL in order to have the ability of ad-hoc queries. So, depending on the
+amount of tracing data we can extract the either from the database or by using
+Hadoop. In our case, we used Hadoop to calculate the average journaling time per
+OSD. So, simply by changing each local Scribe server's configuration file, we
+chose to send data to a Scribe server connected to HDFS and not Zipkin. Then, we
+created a Map-Reduce job to extract the information wanted as described in
+Section \ref{sec:blkin-hadoop}. The information gathered can be seen in Table
+\ref{tab:hadoop-journal}.
+
+\subsection{Using Zipkin to detect abnormal behaviors}
+
+The other BlkKin's use is an online anomaly detection mechanism. According to
+\cite{china-detector}, Numerous techniques have been proposed for detecting
+system anomalies. Among them, the simplest ones are the threshold-based
+techniques which are a form of service level agreements (SLAs). They are very
+useful on the condition that their users clearly know the key metric to monitor
+and the best value of the thresholds in different scenarios.  Unfortunately, it
+is very difficult, even for an expert, to correctly choose the necessary metrics
+to monitor and set the right values of the thresholds for different scenarios in
+the context of today's complex and dynamic computer systems. In addition,
+statistical learning or data mining techniques are widely employed to construct
+probability models for detecting various anomalies in large-scale systems based
+on some heuristics and assumptions, although these heuristics and assumptions
+may only hold in some particular systems or scenarios. Other methods
+(\cite{syslog-svm}), include artificial intelligence and neural networks, but
+they require large training datasets.
