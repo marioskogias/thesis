@@ -350,14 +350,28 @@ created a Map-Reduce job to extract the information wanted as described in
 Section \ref{sec:blkin-hadoop}. The information gathered can be seen in Table
 \ref{tab:hadoop-journal}.
 
+\begin{table}[H]
+    \centering
+    \begin{tabular}{ | l | l | }
+        \hline
+        OSD  & Journaling time ($\mu$sec)  \\ \hline \hline
+        OSD1 & 401  \\ \hline
+        OSD2 & 494  \\ \hline
+        OSD3 & 475  \\ \hline
+        OSD4 & 475  \\ \hline
+    \end{tabular}
+    \caption{Average journaling time for the 4 OSDs}
+    \label{tab:hadoop-journal}
+\end{table}
+
 \subsection{Using Zipkin to detect abnormal behaviors}
 
-The other BlkKin's use is an online anomaly detection mechanism. According to
-\cite{china-detector}, Numerous techniques have been proposed for detecting
+The other BlkKin's use is as an online anomaly detection mechanism. According to
+\cite{china-detector}, numerous techniques have been proposed for detecting
 system anomalies. Among them, the simplest ones are the threshold-based
 techniques which are a form of service level agreements (SLAs). They are very
 useful on the condition that their users clearly know the key metric to monitor
-and the best value of the thresholds in different scenarios.  Unfortunately, it
+and the best value of the thresholds in different scenarios. Unfortunately, it
 is very difficult, even for an expert, to correctly choose the necessary metrics
 to monitor and set the right values of the thresholds for different scenarios in
 the context of today's complex and dynamic computer systems. In addition,
@@ -367,3 +381,38 @@ on some heuristics and assumptions, although these heuristics and assumptions
 may only hold in some particular systems or scenarios. Other methods
 (\cite{syslog-svm}), include artificial intelligence and neural networks, but
 they require large training datasets.
+
+In this part of the evaluation, we present how we used Zipkin to detect common
+cases of anomaly that are possible to happen in a storage cluster. This
+abnormalities refer to either network or disk problem. We tried a threshold
+based alerting approach as a proof of concept, while the expressiveness and
+correlation capabilities of BlkKin allow further investigation for more
+correlative detection models. In our model, we conducted several tracing
+sessions for different IO loads and filled a Hadoop cluster with these data.
+Afterwards, through Map-Reduce jobs, we concluded on the thresholds we are going
+to use for the specific hardware and depending on the expected load. The
+thresholds included the communication times through the RADOS protocol and the
+times for journaling and filestore access. Then, we inserted these threshold
+values to the BlkKin monitoring tool. 
+
+Apart from BlkKin, we needed to find a way to simulate a faulty situation. For a
+network fault this was easy using the \texttt{tc} tool. This tool enables the
+user to insert common network faults, such as packet loss, latency or packet
+corruption.  However, the case of disk faults is more complex. To simulate a
+faulty disk state there are multiple options. The most easy and the finally
+chosen is to add a significant IO load using fio with multiple threads making
+dummy read request to the specific disk. In our case of RADOS, since we
+constantly write 4Mb objects, this will increase the disk latency. The second
+choice is to use \texttt{cgroups} and the \texttt{blockio} controller. This
+choice enables us to throttle a disk bandwidth, by throttling the bandwidth of
+the processes writing to this disk, namely the OSD process. Another choice is to
+use the device mapper to create a faulty sector. The final choice is to use the
+Linux kernel fault injection
+capabilities\footnote{https://www.kernel.org/doc/Documentation/fault-injection/fault-injection.txt}.
+The complexity of the latter choices and the kernel dependencies made us avoid
+them and just a dummy read IO load to the disk that we need to act as in case of
+a fault.
+
+
+
+
