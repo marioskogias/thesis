@@ -413,6 +413,28 @@ The complexity of the latter choices and the kernel dependencies made us avoid
 them and just a dummy read IO load to the disk that we need to act as in case of
 a fault.
 
+So, to simulate a disk fault we added a read IO load in the OSD4 journal
+partition. The results in Zipkin can be seen in Figure \ref{fig:disk-fault.png}.
+As we can see, the Journaling span of the OSD4 takes significantly more time,
+when compared to a normal behaviour as seen in Figure
+\ref{fig:zipkin-overview.png} and as a result the whole request completion is
+affected since journaling is synchronous and encapsulated within the request
+process. 
 
+\diagram{Injected disk fault - Journaling Latency}{disk-fault.png}
 
+Of course, this journaling duration is above the accepted threshold. So, the
+BlkKin monitoring UI would illustrate the problem as seen in Figure
+\ref{fig:disk-fault-blkin.png}.
 
+\diagram{Journaling Latency - BlkKin monitoring UI}{disk-fault-blkin.png}
+
+A similar situation was simulated for a network problem. Using \texttt{tc} we
+added 10 ms of latency to the NIC attached to the host where OSD1 and OSD3 run.
+The result are extended communication times that can be seen as part of the
+\texttt{Main} spans in Figure \ref{fig:network-error.png}. Again this faulty
+situation is observed as seen in Figure \ref{fig:network-error-blkin.png}
+through the BlkKin monitoring tool.
+
+\diagram{Network Latency - Zipkin  UI}{network-error.png}
+\diagram{Journaling Latency - BlkKin monitoring UI}{network-error-blkin.png}
