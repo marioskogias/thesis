@@ -1,3 +1,58 @@
 \chapter{Conclusion}\label{ch:conclusion}
 
+\section{Concluding Remarks}
+
+This thesis handles with the problem of low overhead distributed tracing aimed
+to analyze software defined storage systems. In this kind of multi-layered
+software architectures finding and locating bottlenecks and potential or even
+real faults is pretty challenging because of their complexity. After evaluating
+both various logging and tracing mechanism as well as different tracing schemas,
+we decided to implement our own tracing infrastructure called BlkKin. BlkKin is
+based on opensource technologies, namely LTTng and Zipkin, and implements the
+tracing semantics used by Google's Dapper tracing infrastructure. So BlkKin is a
+low-overhead tracing infrastructure that enables live tracing for applications
+written in C/C++ and provides two distinct user interfaces, so that the end user
+can take real time information about the system.
+
+In order to accomplish this endeavour, we had to work with the LTTng community
+and extend their software so that it can communicate with Zipkin and create an
+instrumentation library for easy application instrumentation.
+
+As a proof of concept for our system, we instrumented Archipelago and RADOS
+source code. Consequently, we were able to track an IO request's route from the
+time Qemu accepted it until it was finally served by RADOS and investigate any
+kind of latencies or bottlenecks each processing phase may have. Also, we
+simulated different faulty situations that a distributed storage system may face
+and investigated the use of BlkKin as an alerting mechanism for such kind of
+faults.
+
+However, this work was just the beginning of cross-layered distributed tracing,
+since it provided the framework for further investigation. Our mechanism can be
+used in any kind of low-overhead application that needs a tracing and
+visualization infrastructure.  So, far the Ceph community has showed interest
+for BlkKin and we are in close contact so that BlkKin can become the main
+tracing infrastructure for RADOS. 
+ 
 \section{Future Work}
+BlkKin future plans/work include:
+\begin{itemize}
+\item Better live support, after the Babeltrace plugin system is released.
+\item Better sampling mechanism that takes into account the request's special
+characteristics, so that meaningful information is not lost because of sampling
+\item Offer Babeltrace plugins as part of the LTTng source tree in the form of a
+Python module availabe at \texttt{pip}.
+\item Use BlkKin in different kinds of distributed systems such as parallel
+applications, MPI for example.
+\end{itemize}
+
+As far as the RADOS instrumentation is concerned, future work includes:
+\begin{itemize}
+\item Better RADOS instrumentation not only for read and write requests. This
+instrumentation requires deep knowledge of the software's internals so that its
+bottlenecks are found.
+\item Implementation of a correlative alerting system that relates the
+replica operations with the cluster's health in order to avoid our threshold
+based alerting mechanism.
+\item Use of BlkKin tracing data from RADOS instrumentation to create an
+AI-based failure detector.
+\end{itemize}
