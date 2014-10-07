@@ -13,12 +13,13 @@ When back in April 1965 Gordon E. Moore stated the following
 \end{quotation}
 
 had no idea that he had actually started a race among the academia and the
-industry to overcome or at least abide the this law.
+industry to overcome or at least abide the his law.
 
-At first, since the technology was premature, the evolution in VLSI technology
-went hand in hand with the evolution in computer architecture. The more and
-faster transistors resulted in achievements in instruction level parallelism
-(ILP). From 1975 to 2005 the endeavour put in computer architecture resulted in 
+During the early years of this race, since the field was premature, the
+development was based on the evolution in VLSI technology which went hand in
+hand with the evolution in computer architecture. The more and faster
+transistors resulted in the achievement of instruction level parallelism (ILP).
+From 1975 to 2005 the endeavour put in computer architecture resulted in
 technological advances varying from deeper pipelines and faster clock speeds to
 superscalar architectures. But in around 2005 the ILP wall was hit. Transistors
 could not be utilized to increase serial performance, logic became too complex
@@ -27,7 +28,10 @@ to the creation of multicore systems and entered the programmers to the jungle
 of parallel software. So far the evolution was almost in accordance with the
 famous law. However, in around 2009 to 2011, it was the power wall's time to be
 hit. The famous power equation $P=cV^2f$ along with the CPU to memory gap
-(eikona) led to the technological burst of distributed and cloud computing.
+(Figure \ref{fig:mem_cpu_gap.jpg}) led to the technological burst of
+distributed and cloud computing as a final attempt to abide by Moore's law.
+
+\diagramscale{CPU to Memory gap}{mem_cpu_gap.jpg}{0.8}i
 
 In 2009 Amazon.com introduced the Elastic Compute Cloud and since then the term
 `cloud' is one of the hottest buzzwords not only among the industry and academia
@@ -44,40 +48,51 @@ NIST (National Institute of Standards and Technology), is the following:
     ,three service models, and four deployment models.''\cite{clouddef}
 \end{quotation}
 
+Different in motivation, though same in the outcome, the evolution of storage
+systems followed a different route but again resulted in distributed storage
+systems that serve the demands of cloud computing. Several technological aspects
+,like the advent of RAID, and economic factors, like the decreasing hard drives'
+price, led to the evolution of distributed storage, which nowadays in the only
+way to cope with the profuse amount of data, no matter how fast the storage
+media may become.
+
 In the previous brief computer chronology, I kept describing bottlenecks and
-walls to be overcome. However, it not clear how these bottlenecks become obvious
-and how scientists can be sure that they have reached one's technology's limits
-before moving on to the next one. The answer to the previous questions has
-always been given through tracing. Tracing is a process recording information
-about a program's execution, while it is being executed. These information may
-be low level metrics like performance counters or time specific metrics in order
-to evaluate system's latencies and throughput. Tracing data are mostly useful
-for developers and can be used for debugging, performance tuning and performance
-evaluation. From the single-cpu, integrated computer to the hundreds-node cloud
-infrastructure, trace and performance engineers face challenging problems that
-vary from platform to platform, but in any case play a vital role the system's
-design and implementation.
+walls to be overcome. However, it not clear how these bottlenecks become
+obvious and how scientists can be sure that they have reached one's
+technology's limits before moving on to the next one. The answer to the
+previous questions has always been given through \textit{tracing}. Tracing is a
+process recording information about a program's execution, while it is being
+executed. These information may be low level metrics like performance counters
+or time specific metrics in order to evaluate system's latencies and
+throughput. Tracing data are mostly useful for developers and can be used for
+debugging, performance tuning and performance evaluation. From the single-cpu,
+integrated computer to the hundreds-node cloud infrastructure, trace and
+performance engineers face challenging problems that vary from platform to
+platform, but in every case play a vital role the system's design and
+implementation.
 
-Cloud and distributed computing provided trace engineers with more challenging
-problems. The system scale is now much greater and program execution is far from
-deterministic and can take place in any cluster node. So each program execution
-is not bounded to a specific context. Other problems that needed solving
-was data and time correlation between the different computing nodes. Also,
-unlike single chip platforms that can be individually traced and evaluated,
-cloud infrastructures need to be traced with full-load under production
-conditions. This set more restrictions concerning the overhead that tracing adds
-to the application. Finally, tracing is notorious about the amount of data that
-produces. So distributed and cloud tracing demands the use of distributed data
-storage systems and processing methods like distributed NOSQL databases and
-Map-Reduce frameworks.
+Cloud and distributed computing provided trace engineers with even more
+challenging problems. The system scale is now much greater and program
+execution is far from deterministic and can take place in any cluster node. So
+each program execution is not bounded to a specific context. Other problems
+that needed solving was data and time correlation between the different
+computing nodes. Also, unlike single chip platforms that can be individually
+traced and evaluated, cloud infrastructures need to be traced with full-load
+under production conditions. This sets more restrictions concerning the overhead
+that tracing adds to the application. Finally, tracing is notorious about the
+amount of data that produces. So distributed and cloud tracing demands the use
+of distributed data storage systems and processing methods like distributed
+NOSQL databases and Map-Reduce frameworks for keeping and manipulating the
+tracing information. 
 
-So to sum up, as described by any design model, the system verification consists
-a major part of a system's implementation and working  process. Verification is
-achieved through monitoring and tracing. Depending on the system's nature
-tracing and monitoring process and the tools used may vary. Picking the right
-tracing tools that will reveal the system's vulnerabilities and faults can be
-very demanding and the performance engineer for bringing them to light,
-respecting all the prerequisites set by the system.
+So to sum up, as described by every software design model, the system
+verification consists a major part of a system's implementation and working
+process. Verification is achieved through monitoring and tracing. Depending on
+the system's nature, the process of tracing and monitoring as well as the tools
+used may vary. Picking the right tracing tools that will reveal the system's
+vulnerabilities and faults can be very demanding and it is the performance
+engineer's taks to bring them to light, respecting all the prerequisites set by
+the system.
 
 \section{Thesis motivation}
 The motivation behind this thesis emerged from concerns about the storage 
@@ -112,12 +127,13 @@ that implements the following services which are used by \okeanos:
 
 Synnefo provides each virtual machine with at least one virtual volume
 provisioned by the Volume Service called Archipelago\cite{archip-paper} and will
-be furthered detailed in Chapter \label{}. This thesis' purpose is to provide
-the developer or the system administrations with a cross-layer representation
-accompanied with the equivalent metrics and time information of an I/O request's
-route within the infrastructure from the time it is created inside the virtual
-machine till it is finally served by the storage backend. The design and
-implementation has to be done respecting the following two prerequisites:
+be furthered detailed in Section \ref{sec:archip-bkg}. This thesis' purpose is
+to provide the developer or the system administrator with a cross-layer
+representation accompanied with the equivalent metrics and time information of
+an I/O request's route within the infrastructure from the time it is created
+inside the virtual machine till it is finally served by the storage backend. The
+design and implementation has to be done respecting the following two
+prerequisites:
 
 \begin{itemize}
     \item The tracing information should be gathered and processed in real-time
@@ -144,9 +160,45 @@ of them would separate the tracing from the working phase because of the great
 added overhead, others provided no mechanism for data correlation, while the
 traditional monitoring systems did not meet our low-level tracing needs.
 
-The proposed system is called \textit BlkKin. It is designed respected the
-aforementioned prerequisites and make use of the latest tracing semantics and
+The proposed system is called \textit{BlkKin}. It is designed respected the
+aforementioned prerequisites and makes use of the latest tracing semantics and
 infrastructures employed by great tech companies like Google and Twitter.  
 
 \section{Thesis structure} 
 This thesis is structured as follows:
+
+\begin{description}
+\item[Chapter \ref{ch:bkg}] \hfill \\
+We provide all the necessary background information, both technical and
+theoretical, so that the reader becomes familiar with the concepts and ideas
+described. We cite a brief overview of the existing tracing and monitoring
+infrastructures along with their advantages and disadvantages and how they
+affected BlkKin's design and implementation. Finally, we describe Archipelago
+and RADOS, the two systems we instrumented as a BlkKin's proof of concept.
+
+\item[Chapter \ref{ch:lttng}] \hfill \\
+We analyze Linux Trace Toolkit - next generation (LTTng), which is one of the
+basic building blocks of BlkKin. LTTng is used as BlkKin tracing backend.
+
+\item[Chapter \ref{ch:dapper-zipkin}] \hfill \\
+We describe the tracing concepts we employed in BlkKin so that we can achieve
+the needed expressiveness. We also present Zipkin, which is an open-source
+implementation of these tracing concepts and another BlkKin's building block.
+
+\item[Chapter \ref{ch:design}] \hfill \\
+We describe the BlkKin's design and architecture, the communication protocols
+used and the tracing information flow.
+
+\item[Chapter \ref{ch:implementation}] \hfill \\
+We analyze the process of creating BlkKin, our contributions to the tracing
+infrastructure and the means used or created to extract the information needed
+in order to serve the different roles that BlkKin can play.
+
+\item[Chapter \ref{ch:evaluation}] \hfill \\
+We cite our experience of using BlkKin in Archipelago and RADOS instrumentation
+and its use as a debugging and an alerting mechanism.
+
+\item[Chapter \ref{ch:conclusion}] \hfill \\
+We provide some concluding remarks and give some future work that could be done
+to improve and evolve BlkKin.
+\end{description}

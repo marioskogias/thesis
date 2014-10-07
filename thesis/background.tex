@@ -26,8 +26,8 @@ a broad range of applications. Historically, data centers first created
 to an application, and visible as a number of `virtual hard drives' (i.e.
 LUNs). Initally, a SAN (Storage-Area-Network) consolidates such storage islands
 together using a high-speed network. However, a SAN does not provide file
-abstraction, only block-level operations. Also, the cost of scaling a SAN
-infrastructure scales exponentially. These boosted the development of more
+abstraction, but only block-level operations. Also, the cost of scaling a SAN
+infrastructure increases exponentially. These boosted the development of more
 \emph{service-oriented-architectures}. Emerging clustered storage architectures
 constructed from storage bricks or object storage devices (OSDs) seek to
 distribute low-level block allocation decisions and security enforcement to
@@ -64,13 +64,14 @@ most popular examples of such systems are: Amazon S3, OpenStack Swift and RADOS.
 However, one common characteristic of all these systems, that led to the
 development of this thesis, is that they provide an architecture that easily
 scales out, based on APIs, but which is difficult to monitor and find out what
-really went wrong in case of a problem. This leads to a di-centralized data
+really went wrong in case of a problem. This leads to a dicentralized data
 collection and a centralized data processing architecture for tracing
-information which is further explained in Chapter \ref{}.
+information. This is how we designed BlkKin's architecture which is analyzed in
+Chapter \ref{ch:design}.
 
 \subsection{RADOS}\label{sec:rados}
 RADOS stands for  Reliable, Autonomic Distributed Object Store. It is the object
-store component of Ceph\footnote{http://ceph.com/}.Ceph is a free distributed
+store component of Ceph\footnote{http://ceph.com/}. Ceph is a free distributed
 object store and file system that has been created by Sage Weil for his doctoral
 dissertationi\cite{weil-thesis} and has been supported by his company, Inktank,
 ever since.  RADOS seeks to leverage device intelligence to distribute the
@@ -100,7 +101,7 @@ Ceph's building blocks can be seen in Figure \ref{fig:ceph.png}
 
 \diagram{Ceph abstraction}{ceph.png}
 
-RADOS operations are based on the following components:
+RADOS functionality is based on the following components:
 \begin{itemize}
     \item \textit{object store daemons}, which are userspace processes that run 
         in the storage backend and are responsible for storing the data.
@@ -124,8 +125,8 @@ CRUSH maps that each monitor daemon holds.
   
 Since we would like to instrument RADOS code and measure its performance, apart
 from the theoretical background, we should also explain some of its operating
-internals, so that further analysis is consolidated. So, in brief, we will try
-to explain an IO request's route within a RADOS infrastructure.
+internals, to consolidate further analysis. So, in brief, we will try to explain
+an IO request's route within a RADOS infrastructure.
 
 Although, as seen in Figure \ref{fig:ceph.png}, RADOS has multiple entry points
 (RBD, CephFS, RADOSGW), we are interested in the interaction with librados.
@@ -134,13 +135,13 @@ an API that enables to modify (CRUD) objects and interact with the Ceph
 monitors. There are binding for various languages like C, Python and Java. 
 
 Hypothetically, we have an application using librados, which can also run
-remotely from the RADOS cluster. The application want to write an objects. So, a
-nIO request is initiated from librados. RADOS employs an asynchronous, ordered
-point to point message passing library for communication. So, this request is
+remotely from the RADOS cluster. The application wants to write an objects. So,
+an IO request is initiated from librados. RADOS employs an asynchronous, ordered
+point to point message passing library for communication. This request is
 serialized and a TCP message is created and sent to the RADOS cluster. After
 receive, this packet is handled by the equivalent RADOS Messenger classes,
 decoded and based on its kind, is placed in a \textit{dispatch queue} to be
-served. This specific object belongs to a specific placement group. So, when the
+served. This specific object belongs to a certain placement group. So, when the
 request reaches the top of the queue, based on this pg, the equivalent OSD
 undertakes its serving. Based on the replication factor, the equivalent number
 of replication requests is sent to other OSDs responsible for the same pg.
@@ -172,7 +173,7 @@ Archipelago's end goal is to:
 \item Provide backend drivers for different storage technologies
 \end{itemize}
 
-As it is show in Figure \ref{fig:archipelago-overview.png}, Archipelago lies
+As it is shown in Figure \ref{fig:archipelago-overview.png}, Archipelago lies
 between the VM's block device and the underlying storage level.
   
 \diagram{Archipelago Overview}{archipelago-overview.png}
@@ -180,8 +181,8 @@ between the VM's block device and the underlying storage level.
 \subsection{Archipelago Internals}
 
 Archipelago has a modular internal architecture consisting of multiple
-components communicating over a custom made IPC mechanism called \textit XSEG.
-Each component communicating over XSEG is called \textit peer. 
+components communicating over a custom made IPC mechanism called \textit{XSEG}.
+Each component communicating over XSEG is called \textit{peer}. 
 
 XSEG is a custom mechanism that defines a common communication protocol for all
 peers, regardless of their type (userspace/kernspace,
@@ -216,9 +217,9 @@ consists of, cloning and snapshotting volumes and creating new ones.
 \item[BlockerDaemon(blockerd)]
 blockerd is not a specific entity but a family of drivers, each of which is
 written for a specific storage type (as seen at the down part of Figure
-\ref{fig:archip-endp.png}).Blockers have a single purpose, to read/write objects
-from/to the storage.Currently, there are blockers for NFS and the RADOS object
-storage.
+\ref{fig:archip-endp.png}). Blockers have a single purpose, to read/write
+objects from/to the storage. Currently, there are blockers for NFS and the RADOS
+object storage.
 
 \end{description} 
 
@@ -230,15 +231,13 @@ peers over XSEG for a VM to perform an IO operation.
 As it is obvious from the above analysis, Archipelago's modular design is based
 on XSEG. XSEG affects significantly the overall Archipelago performance. So, we
 would like to have a mechanism that enables Archipelago monitoring without
-degrading Archipelago performance. This mechanism would reveal the latencies and
-bottlenecks between the several peers and enable Archipelago engineers to
-improve its performance. This mechanism is the proposed BlkKin system.
-Specifically, we will use BlkKin to monitor and measure the path from the QEMU
-driver until the storage layer.
+degrading Archipelago's performance. This mechanism would reveal the latencies
+and bottlenecks between the several peers and enable Archipelago engineers to
+improve its performance.
 
 \section{Tracing Systems}\label{sec:tracing-bkg}
 Understanding where time has been spent in performing a computation or servicing
-a request is at the forefront of the performance analyst’s mind. Measurements
+a request is at the forefront of the performance analyst's mind. Measurements
 are available from every layer of a computing system, from the lowest level of
 the hardware up to the top of the distributed application stack. In recent years
 we have seen the emergence of tools which can be used to directly trace events
@@ -373,16 +372,17 @@ scale well.
 
 \section{Logging Systems}\label{sec:logging-bkg}
 
-Logs are a critical part of any system, they give you insight into what a system
-is doing as well what happened. Unlike tracing, log data are not low-level and
-do not refer to the system's performance and there is no special care about the
-overhead that logging add to the system. Virtually every process running on a
-system generates logs in some form or another. Usually, these logs are written
-to files on local disks. When your system grows to multiple hosts, managing the
-logs and accessing them can get complicated. Searching for a particular error
-across hundreds of log files on hundreds of servers is difficult without good
-tools. A common approach to this problem is to setup a centralized logging
-solution so that multiple logs can be aggregated in a central location.
+Logs are a critical part of any system. They give you insight into what a system
+is doing as well as what happened in case of failure. Unlike tracing, log data
+are not low-level and do not refer to the system's performance. There is no
+special care about the overhead that logging add to the system. Virtually every
+process running on a system generates logs in some form or another. Usually,
+these logs are written to files on local disks. When your system grows to
+multiple hosts, managing the logs and accessing them can get complicated.
+Searching for a particular error across hundreds of log files on hundreds of
+servers is difficult without good tools. A common approach to this problem is to
+setup a centralized logging solution so that multiple logs can be aggregated in
+a central location.
 
 There are various options for log data aggregation as well as for visualizing
 the aggregated data. Some of them are cited here:
@@ -435,7 +435,7 @@ traditional syslog options.
 One popular solution is
 Scribe\footnote{https://github.com/facebookarchive/scribe}. Scribe is a server
 for aggregating log data that's streamed in real time from clients. It is
-designed to be scalable and reliable.  It was used and released by Facebook as
+designed to be scalable and reliable. It was used and released by Facebook as
 open source. Scribe is written in C++ and it worths mentioning its transport
 layer and how Scribe logging data are processed and finally stored.
 
@@ -444,24 +444,24 @@ Thrift\footnote{https://thrift.apache.org/}. The Apache Thrift software
 framework, for scalable cross-language services development, combines a software
 stack with a code generation engine to build services that work efficiently and
 seamlessly between different programming languages. After describing the service
-in a specific file (thrift file), the framework is  responsible for generating
+in a specific file (thrift file), the framework is responsible for generating
 the code to be used to easily build RPC clients and servers that communicate
 seamlessly across programming languages. For Scribe especially the thrift file
 is the following:  
 
 \ccode{Scribe thrift definition file}{scribe.thrift}
 
-In the above file a \texttt Log method is defined, which takes a list of
-\texttt LogEntry items as parameter. Every \texttt LogEntry consists of two
+In the above file a \texttt{Log} method is defined, which takes a list of
+\texttt{LogEntry} items as parameter. Every \texttt{LogEntry} consists of two
 strings, a category and a message. This specific Log method can return two
 different results codes, either `OK' or `TRY\_LATER'. Based on this file, using
 Thrift we can create Scribe clients for every programming language.
 
-Concerning \textbf{data manipulation} Scribe provides the following options.
-Based on the message's category, it can store the log entries in different
-files, one per category. Also Scribe has Hadoop support and can store the
-tracing information to an HDFS so that they can be processed later using
-Map-Reduce jobs.
+Concerning \textbf{data manipulation} Scribe provides the following options. It
+can store the messages it receives either locally to the local filesystem, or
+remotely to HDFS, so that they can be processed later using Map-Reduce jobs.
+Also, based on the message's category, it can store the log entries in different
+files, one per category.
 
 Scribe servers are arranged in a directed graph, with each server
 knowing only about the next server in the graph. This network topology allows
@@ -492,20 +492,21 @@ Cairo\footnote{http://www.cairographics.org/}
 \end{description}
 
 \subsection{Ganglia}
-Ganglia\cite{ganglia} is a scalable distributed monitoring system for high performance
-computing systems such as clusters and Grids and grew out of the University of
-California, Berkeley. It is based on a hierarchical design targeted at
-federations of clusters. It relies on a multicast-based listen/announce protocol
-to monitor state within clusters and uses a tree of point-to-point connections
-amongst representative cluster nodes to federate clusters and aggregate their
-state. It leverages widely used technologies such as XMLfor data representation,
-XDR for compact, portable data transport, and RRDtool for data storage and
-visualization. It uses carefully engineered data structures and algorithms to
-achieve very low per-node overheads and high concurrency. The implementation is
-robust, has been ported to an extensive set of operating systems and processor
-architectures, and is currently in use on over 500 clusters around the world. 
+Ganglia\cite{ganglia} is a scalable distributed monitoring system for high
+performance computing systems such as clusters and grids. It grew out of the
+University of California, Berkeley and is based on a hierarchical design
+targeted at federations of clusters. It relies on a multicast-based
+listen/announce protocol to monitor state within clusters and uses a tree of
+point-to-point connections amongst representative cluster nodes to federate
+clusters and aggregate their state. It leverages widely used technologies such
+as XML for data representation, XDR for compact, portable data transport, and
+RRD tool for data storage and visualization. It uses carefully engineered data
+structures and algorithms to achieve very low per-node overheads and high
+concurrency. The implementation is robust, has been ported to an extensive set
+of operating systems and processor architectures, and is currently in use on
+over 500 clusters around the world. 
 
-\diagram{Ganglia architecture}{ganglia-architecture.png}
+\diagramscale{Ganglia architecture}{ganglia-architecture.png}{0.9}
 
 Ganglia architecture is made up of the following components.
 
@@ -555,19 +556,21 @@ instrumented application since their solutions pass through the kernel space.
 This extra overhead makes them unsuitable for live tracing. The solution for
 for the BlkKin tracing backend was given from the Linux Trace Toolkit - next
 generation (LTTng) because it provides separate mechanisms for kernel and user
-space tracing. LTTng is furthered examined in Chapter \ref{}.
+space tracing. LTTng is furthered examined in Chapter \ref{ch:lttng}.
 
 Concerning the logging systems, we need to imitate their architecture for
-BlkKin's architecture, since we need a central trace aggragation point and a UI
-that visualizes the information. We can conclude that we need:
+BlkKin's architecture, since we need a central trace aggregation point and a UI
+that visualizes this information. We can conclude that we need:
 \begin{itemize}
-\item[tracing daemon] that runs on every cluster node and collects data  with a low-overhead
+\item[tracing daemon] that runs on every cluster node and collects data with a
+low-overhead
 \item[central data collector] where all tracing information are stored
-\item[Web UI] where tracing information are rendered in a way that extracts the necessary
-information revealing problems and performance issues in the first place.
-For more elaborate information extraction, trace information can be furthered
-processed apart from the UI.  
+\item[Web UI] where tracing information are rendered in a way that extracts the
+necessary information revealing problems and performance issues in the first
+place. For more elaborate information extraction, trace information should be
+furthered processed though other entry points apart from the UI.  
 \end{itemize}
-For data collection, we are going to use LTTng, while for the data aggregation and the visualization we
-are going to use Zipkin, a distributed tracing system created by Twitter. Zipkin
-as well as the reasons for our choice are furthered examined in Chapter \ref{}.
+For data collection, we are going to use LTTng, while for the data aggregation
+and the visualization we are going to use Zipkin, a distributed tracing system
+created by Twitter. Zipkin as well as the reasons for our choice are furthered
+examined in Section \ref{sec:zipkin}.
