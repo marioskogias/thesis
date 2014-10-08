@@ -2,57 +2,66 @@
 
 In this section we will describe our experience from using BlkKin in a real
 usecase senario. The instrumented infrastructure is described in Section
-\ref{sec:infra}. After that, in Section \ref{sec:metrics} we analyse performance
-metrics concerning the network and system overhead that justify our design and
-deployment choices. Finally, in Section \ref{sec:failures} we explain how we
-used BlkKin to identify system faults which are virtually inserted by us, but
-reflect possible real failures or bottlenecks. 
+\ref{sec:infra} and the BlkKin environment in Section \ref{sec:blk-env}. After
+that, in Section \ref{sec:metrics} we analyse performance metrics concerning
+the network and system overhead that justify our design and deployment choices.
+Finally, in Section \ref{sec:failures} we explain how we used BlkKin to
+identify system faults which are virtually inserted by us, but reflect possible
+real failures or bottlenecks. 
 
 
-\section{Instrumented infrastructure}\label{sec:infra} As a use-case, we used
-BlkKin to instrument Archipelago and RADOS. These systems were examined in
-Sections \ref{sec:archip-bkg} and \ref{sec:rados} respectively. Archipelago is
-written is C and RADOS in C++. So we used the BlkKin library C++ wrapper for
-the RADOS instrumentation. Instead of using the \texttt{archip-bench} tool,
-which is part of Archipelago, to initiate IO requests, we instrumented the Qemu
-Archipelago driver. So, using Qemu we start a virtual machine which has an
-Archipelago drive and create different IO loads to this driver using
-\texttt{fio}\footnote{http://linux.die.net/man/1/fio}. Thus we can track the IO
-request from the time Qemu receives it until it is finally served by RADOS. 
+\section{Instrumented infrastructure}\label{sec:infra} i
+As a use-case, we used BlkKin to instrument Archipelago and RADOS. These systems
+were examined in Sections \ref{sec:archip-bkg} and \ref{sec:rados} respectively.
+The purpose of this instrumentation is to track the route of the IO request from
+the time they are created until they are finally served by RADOS. We chose to
+instrument these applications because they require low-overhead instrumentation
+and entail multiple obscure points because of their multi-layered architecture
+that BlkKin can shed light to. Archipelago provides a cmd tool to create IO
+request \texttt{archip-bench}. However, we chose to instrument Archipelago's
+Qemu driver. So, instead of archip-bench the IO requests are initiated by a real
+virtual machine based on Qemu that has an Archipelago-backed disk. For our
+testcases we used \texttt{fio}\footnote{http://linux.die.net/man/1/fio} to
+create the needed IO load to the Archipelago volume. 
+
+As far as the instrumentation itself is concerned, Archipelago and Qemu are
+written in C and RADOS in C++. So we used both the BlkKin C and C++ library.
 
 The Qemu Archipelago driver receives the IO requests from Qemu and creates XSEG
-requests for the VLMC. Qemu initiates the tracing information as well and
-Qemu spans are the root spans. After that, these tracing information is
-carried as part of the XSEG request. To do that, we needed to extend
-\texttt{libxseg}\footnote{https://github.com/grnet/libxseg} and add the
-tracing information needed as shown in Listing \ref{lst:blkin-info.h} nested in
-the XSEG request. So, as far as Archipelago in concerned, the tracing
-information is transmitted as part of the XSEG request. Each Archipelago peer
-is considered a different service, with a different endpoint that creates a
-single span per IO request in the general case. So, in the Zipkin UI we expect
-to see each peer represented as a single bar, whose length indicates the time
-this peer needed to serve this specific request.
+requests for the VLMC. Qemu initiates the tracing information as well and Qemu
+spans are the root spans. After that, this tracing information is carried as
+part of the XSEG request. To do that, we needed to extend
+\texttt{libxseg}\footnote{https://github.com/grnet/libxseg} and add the tracing
+information needed as shown in Listing \ref{lst:blkin-info.h} nested in the XSEG
+request. So, as far as Archipelago in concerned, the tracing information is
+transmitted as part of the XSEG request. Each Archipelago peer is considered a
+different service, with a different endpoint that creates a single span per IO
+request in the general case. So, in the Zipkin UI we expect to see each peer
+represented as a single bar, whose length indicates the time this peer needed to
+serve this specific request.
 
 Unlike Archipelago where the instrumentation was obvious, instrumenting RADOS
 was more challenging. RADOS exposes a C-API (librados) which is used in the
 Archipelago rados-peer. So, the first thing we did was to instrument the read
 and write calls of this API. Then, we needed to extend the RADOS classes to
-transfer the tracing information. In a nutshell, after librados, Ceph protocol
-which is TCP-based transfers the IO request to the cluster. So, the tracing
+transfer the tracing information. In a nutshell, after librados, Ceph protocol,
+which is TCP-based, transfers the IO request to the cluster. So, the tracing
 information is encoded as part of the \texttt{MOSDOp} Ceph object. Then the
 request after being decoded, enters a dispatch queue and waits to be served.
-Based on the objects affected, a different placement group handles it. After
-the dispatch queue, the request is handled by this pg's primary OSD and then
-based on the replication factor, equal number of replication operations are
-issued that follow the same route. Request handling includes journal access and
-filestore access. In an attempt not to expose much of the RADOS internals, so
-that the Zipkin UI would be self-explanatory even for someone that is not
-familiar with the RADOS code architecture, we tried to instrument the code so
-that we can extract information such as the time spent in the dispatch queue,
-the network communication time, or the journaling duration and at the same time
-we follow the causal relations used by Zipkin. For example, the IO handling by
-the primary OSD causes the replication operations. So the replication
-operations are children spans.
+Based on the objects affected, a different placement group handles it. After the
+dispatch queue, the request is handled by this pg's primary OSD and then based
+on the replication factor, equal number of replication operations are issued
+that follow the same route. Request handling includes journal access and
+filestore access. Through this proof-of-concept RADOS instrumentation, we
+attempted not to expose much of the RADOS internals, so that the Zipkin UI would
+be self-explanatory even for someone that is not familiar with the RADOS code
+architecture. We tried to instrument the code so that we can extract any kind of
+information that would help, such as the time spent in the dispatch queue, the
+network communication time, or the journaling duration and at the same time
+meaningfully follow the causal relations used by Zipkin. For example, the IO
+handling by the primary OSD causes the replication operations. So the
+replication operations are children spans of the handling operation by the
+primary OSD.
 
 As far as the test-bed is concerned, we used two physical nodes LAN
 interconnected, and set up two OSDs on each node. On one of this nodes we
@@ -61,7 +70,7 @@ Archipelago and 2 OSDs and on the other just two OSDs. Each node had a whole
 BlkKin stack running and a local Scribe server. Each Scribe server communicated
 with the central Zipkin collector or the Scribe server logging to the Hadoop
 cluster. For Zipkin we used a 4-core. 8-gb RAM virtual machine, while for the
-Hadoop cluster, as it was used only as a proof of concept, we used 2 2-core,
+Hadoop cluster, as it was used only as a proof of concept, we used two 2-core,
 4-gb virtual machines. 
 
 You can find some specs regarding the hardware and software infrastructure in
@@ -101,7 +110,7 @@ other two on the other node two SAS disks in RAID 0, one each.
     \label{tab:software-specs}
 \end{table}
 
-\section{BlkKin tracing environment}
+\section{BlkKin tracing environment}\label{sec:blk-env}
 In order to set up the tracing environment, apart from the central Scribe
 collector which could be either the Zipkin collector or a Scribe server
 connected to HDFS, on each cluster node you have to follow the next steps to
@@ -111,7 +120,7 @@ live trace:
 \item Start the local Scribe daemon \\ 
     The local Scribe daemon is configured to send the received messages to the
     next Scribe server. In case of connection loss or congestion, the data are
-    stored locally and forward when the problem is solved.
+    stored locally and forwarded when the problem is solved.
 
 \item Start LTTng live tracing \\
     Create a live tracing session and enable all the userspace events for it.
@@ -124,10 +133,11 @@ live trace:
 
 The overall procedure can be seen in Listing \ref{lst:start.sh}
 \bcode{Setting up the tracing environment}{start.sh}
+
 \section{Evaluation metrics}\label{sec:metrics}
 
 In this section we analyze some metrics concerning the network and the system
-overhead that BlkKin poses to the system. These metrics led us to the previous
+overhead that BlkKin imposes to the system. These metrics led us to the previous
 deployment architecture.
 
 \subsection{LTTng vs Syslog}
@@ -135,11 +145,11 @@ First of all, we should evaluate the use of LTTng versus another logging system
 that is based on system calls every time some information needs to be logged.
 SystemTap, DTrace or even syslog make a system call or a stop at a break point
 whenever they need to trace something. This is claimed to have high overhead for
-a system that need to run in full load. As mentioned the BlkKin library was
+a system that needs to run in full load. As mentioned the BlkKin library was
 backend independent, so we we changed the LTTng backend for a syslog backend and
 instrumented a simple client server application with the BlkKin library. Then we
-measured the time eacg backend took to finish tracing. The application was a
-simple two-process application, that communicated over a UNIX pipe. The server
+measured the time each backend took to finish tracing. The application was a
+simple two-process application, that communicate over a UNIX pipe. The server
 created a root span, annotated and then passed a message to the client including
 tracing information. The client created a child span annotated and answered
 back. A single iteration triggers four annotations and we repeated this message
@@ -159,9 +169,10 @@ passing for 10000 times. The results can be seen in Table
 \end{table}
 
 As it was expected the syslog backend was about 90\% slower than LTTng even for
-this single example. So LTTng was the only choice possible that combined the
-low-overhead capability with the variety of tracing options such as user/kernel
-space tracing and performance counter access.
+this single example with few annotations per request. So LTTng was the only
+choice possible that combined the low-overhead capability with the variety of
+tracing options such as user/kernel space tracing and performance counter
+access.
 
 \subsection{Thrift vs JSON format}
 As we mentioned we created two similar Babeltrace plugins, one sending JSON
@@ -206,7 +217,7 @@ and then they were forward using Babeltrace live to the Scribe server. We
 measured the network traffic to localhost and to the Scribe server.
 
 Our first notice when using \texttt{tcpdump} on localhost is that relayd polls
-consumerd on a specific interval to find out if there are any new data
+consumerd on a specific time interval to find out if there are any new data
 available. So, we wouldn't like to have our cluster being flooded by polling
 messages. Concerning the tracing data themselves, excluding polling, the sums of
 all the TCP packets' payloads sent for the 10 messages mentioned, can be found
@@ -225,16 +236,16 @@ in Table \ref{tab:relayd-scribe} for each daemon.
 \end{table}
 
 However, even if CTF-format is more compact that Thrift, we prefer to avoid the
-polling messages in the cluster LAN and restrict them to localhost and to make
-use of the Scribe batch messaging capability in favor of the less payload size
-that CTF has to offer.
+polling messages in the cluster LAN and restrict them to localhost. We chose to
+make use of the Scribe batch messaging capability in favor of the less payload
+size that CTF has to offer.
 
 \subsection{System overhead}
 In this subsection we evaluate the overhead that BlkKin poses to the
 instrumented application. To do so, we created two different but typical IO
 loads using fio. The first one was 2GB of random 4Kb writes and the second was
 2GB of 64Kb sequential writes. These loads are diverse but really common and
-help up evaluate our systems performance under different working conditions.
+help up evaluate our system's performance under different working conditions.
 So, we ran fio in the virtual machine towards the Archipelago volume and
 measured the bandwidth the system had under different conditions. The scenarios
 we chose was without instrumentation, live tracing without sampling, live
@@ -285,17 +296,17 @@ calls that actually log the information. The case of 4Kb writes is more affected
 because we have more IO request taking place fast one after the other. So the
 LTTng load is greater. Both live tracing without sampling and normal tracing
 affect the system in a similar way. The only change as far as LTTng is concerned
-is that in case if live tracing the consumerd writes the tracing information to
+is that in case of live tracing the consumerd writes the tracing information to
 a TCP socket instead of a local file descriptor. Finally, as we see in the
 scenario of sampled tracing, the degradation is such that we can afford tracing
 our system in production scale. In our scenario, we chose to sample 1/500 IO
 requests. Depending on the system load, this sampling rate can be either reduced
 or increased. It should be mentioned that in our instrumentation we used 113
 annotations per single IO request in order to track its whole route. So, the
-case of so-sampling, live tracing produced a significant amount of network
+case of no-sampling, live tracing produced a significant amount of network
 traffic and should be avoided not only because of this traffic, but also because
 of it, the tracing information take more time to reach to Zipkin. Consequently,
-we will need more time to detect a possible failure or problem.
+we will need more time to detect a possible failure or problem. 
 
 \section{Using BlkKin to detect bottlenecks and failures}\label{sec:failures}
 
@@ -315,14 +326,14 @@ queries based on them.
 
 As seen in Figure \ref{fig:zipkin-overview.png} each span is represented as a
 separate bar whose length is commensurate to the duration of this specific
-processing phase. As far as time is concerned, each request is considered to
-start at time 0 and all timestamp annotations have timestamps relative to the
-first annotation of the trace. Also, if you click on a span that you are
-interested about, you can access this span's annotations as can be seen in
-Figure \ref{fig:zipkin-annotations.png}. In this screenshot we chose to
-investigate an `OSD Handling op', namely the span that annotates the OSD's
-actions to serve and IO request. At the top we can see each timestamp annotation
-with its relative time, while at the bottom we can see the key-value
+processing phase. As far as time is concerned, each request, namely its root
+span, is considered to start at time 0 and all timestamp annotations have
+timestamps relative to the first annotation of the trace. Also, if you click on
+a span that you are interested about, you can access this span's annotations as
+it can be seen in Figure \ref{fig:zipkin-annotations.png}. In this screenshot we
+chose to investigate an `OSD Handling op', namely the span that annotates the
+OSD's actions to serve and IO request. At the top we can see each timestamp
+annotation with its relative time, while at the bottom we can see the key-value
 annotations. For example, this operation handling refers to the specific RADOS
 object whose name can be seen as part of the binary annotation.
 
@@ -331,7 +342,7 @@ object whose name can be seen as part of the binary annotation.
 
 During this thesis evolution, Zipkin changed its UI. The old UI offered another
 visualizing capability that is planned to be added to the new UI soon. This
-capability was about endpoint dependencies. As it is seen in Figire
+capability was about service dependencies. As it is seen in Figure
 \ref{fig:zipkin-depend.png}, each service is depicted as a different circle
 whose radius is commensurate to the processing duration of that specific phase.
 This d3 visualization depicts exactly the information flow.
@@ -342,13 +353,13 @@ In case that these visual representations are not enough and we want to extract
 aggregate values, such as average values we have other choices. As mentioned
 Twitter suggest to deploy Zipkin with Cassandra. However, we deployed Zipkin
 using MySQL in order to have the ability of ad-hoc queries. So, depending on the
-amount of tracing data we can extract the either from the database or by using
-Hadoop. In our case, we used Hadoop to calculate the average journaling time per
-OSD. So, simply by changing each local Scribe server's configuration file, we
-chose to send data to a Scribe server connected to HDFS and not Zipkin. Then, we
-created a Map-Reduce job to extract the information wanted as described in
-Section \ref{sec:blkin-hadoop}. The information gathered can be seen in Table
-\ref{tab:hadoop-journal}.
+amount of tracing data we can extract the information we want either from the
+database or by using Hadoop. In our case, we used Hadoop to calculate the
+average journaling time per OSD. So, simply by changing each local Scribe
+server's configuration file, we chose to send data to a Scribe server connected
+to HDFS and not Zipkin. Then, we created a Map-Reduce job to extract the
+information wanted as described in Section \ref{sec:blkin-hadoop}. The
+information gathered can be seen in Table \ref{tab:hadoop-journal}.
 
 \begin{table}[H]
     \centering
@@ -386,7 +397,7 @@ In this part of the evaluation, we present how we used Zipkin to detect common
 cases of anomaly that are possible to happen in a storage cluster. This
 abnormalities refer to either network or disk problem. We tried a threshold
 based alerting approach as a proof of concept, while the expressiveness and
-correlation capabilities of BlkKin allow further investigation for more
+correlation capabilities of BlkKin allow further investigation of more
 correlative detection models. In our model, we conducted several tracing
 sessions for different IO loads and filled a Hadoop cluster with these data.
 Afterwards, through Map-Reduce jobs, we concluded on the thresholds we are going
@@ -398,20 +409,20 @@ values to the BlkKin monitoring tool.
 Apart from BlkKin, we needed to find a way to simulate a faulty situation. For a
 network fault this was easy using the \texttt{tc} tool. This tool enables the
 user to insert common network faults, such as packet loss, latency or packet
-corruption.  However, the case of disk faults is more complex. To simulate a
+corruption. However, the case of disk faults is more complex. To simulate a
 faulty disk state there are multiple options. The most easy and the finally
-chosen is to add a significant IO load using fio with multiple threads making
-dummy read request to the specific disk. In our case of RADOS, since we
-constantly write 4Mb objects, this will increase the disk latency. The second
-choice is to use \texttt{cgroups} and the \texttt{blockio} controller. This
-choice enables us to throttle a disk bandwidth, by throttling the bandwidth of
-the processes writing to this disk, namely the OSD process. Another choice is to
-use the device mapper to create a faulty sector. The final choice is to use the
-Linux kernel fault injection
+chosen is to add a significant IO load with multiple threads making dummy read
+request to the specific disk. In our case of RADOS, since we constantly write
+4Mb objects, this will increase the disk latency. The second choice is to use
+\texttt{cgroups} and the \texttt{blockio} controller. This choice enables us to
+throttle a disk bandwidth, by throttling the bandwidth of the processes writing
+to this disk, namely the OSD process. Another choice is to use the device mapper
+to create a faulty sector. The final choice is to use the Linux kernel fault
+injection
 capabilities\footnote{https://www.kernel.org/doc/Documentation/fault-injection/fault-injection.txt}.
 The complexity of the latter choices and the kernel dependencies made us avoid
-them and just a dummy read IO load to the disk that we need to act as in case of
-a fault.
+them and just use a dummy read IO load to the disk that we need to act as in
+case of a fault using fio.
 
 So, to simulate a disk fault we added a read IO load in the OSD4 journal
 partition. The results in Zipkin can be seen in Figure \ref{fig:disk-fault.png}.

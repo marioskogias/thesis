@@ -5,7 +5,7 @@ was our choice for BlkKin's tracing backend, and we describe its internal
 characteristics that led us to using it. Specifically, we give an overall
 outline of its architecture and basic notions in Section
 \ref{sec:lttng-overview}. Then, we describe the buffering scheme used both for
-kernel and user space (Section \ref{sec:buffers}) and we continue by citing
+kernel and user space (Section \ref{sec:buffers}) and we continue by citing the
 kernel and use space implementation mechanism in Sections
 \ref{sec:kernel-tracing}, \ref{sec:user-tracing}. Finally we cite the tracing
 format used by LTTng (Section \ref{sec:ctf}) and the mechanism for live tracing
@@ -33,7 +33,7 @@ Apart from LTTng's kernel tracer and userspace tracer, viewing and analysis
 tools are part of the project. In this thesis, we worked with and extended 
 \textit{Babeltrace} \footnote{http://lttng.org/babeltrace}.
 
-Apart from the fact LTTng is a complete toolchan that can be easily installed in
+Except for the fact LTTng is a complete toolchan that can be easily installed in
 almost any Linux distribution and the integrated kernel and user space tracing
 offered, we chose LTTng because of its minimal performance overhead. Since it
 was initially designed to `reproduce, under tracing, problems occurring in
@@ -41,7 +41,7 @@ normal conditions', LTTng was the ideal tool to use for real-time low-overhead,
 block-storage tracing with BlkKin.
 
 In order to understand how LTTng manages to have such a good performance, we
-have to go through its internals. But first, we give an overview outline of its
+have to go through its internals. But first, we give an overview of its
 architecture and basic components. According to D. Goulet's Master thesis
 (\cite{goulet}), LTTng's architecture can be summarized as shown in Figure
 \ref{fig:lttng-arch.png}.  
@@ -50,8 +50,9 @@ architecture and basic components. According to D. Goulet's Master thesis
 
 The \texttt{lttng} command line interface is a small program used to interact
 with the session daemon. Possible interaction are creating sessions, enabling
-events, starting tracing and so on. The use of this command line tool is further
-explained in Chapter \ref{} about how to use BlkKin.
+events, starting tracing and so on. The use of this command line tool to create
+and configure tracing seesions is further explained in Section
+\ref{sec:blk-env} about how to use BlkKin.
 
 Tracing sessions are used to isolate users from each other and create coherent
 tracing data between all tracing sources (Ex: MariaDB vs Kernel). This
@@ -121,12 +122,12 @@ tracing.
 
 As mentioned, a channel is a pipe between an information producer and consumer.
 It serves as a buffer to move data efficiently. It consists of one buffer per
-CPU to ensure cache locality and eliminate false-sharing. Each buffer is made of
-many sub-buffers where slots are reserved sequentially.  A slot is a sub-buffer
-region reserved for exclusive write access by a probe.  This space is reserved
-to write either a sub-buffer header or an event header and payload. Figure
-\ref{fig:buffers.png} shows space being reserved. On CPU 0, space is reserved in
-sub-buffer 0 following event 0. 
+CPU to ensure cache locality and eliminate false-sharing. Each buffer is made
+of many sub-buffers where slots are reserved sequentially.  A slot is a
+sub-buffer region reserved for exclusive write access by a probe.  This space
+is reserved to write either a sub-buffer header or an event header and payload.
+Figure \ref{fig:buffers.png} shows how space is being reserved. On CPU 0, space
+is reserved in sub-buffer 0 following event 0. 
 
 \diagram{Channel layout}{buffers.png}
 
@@ -142,8 +143,8 @@ to CPU 0, shows a fully committed sub-buffer ready for reading.
 
 
 Events written in a reserved slot are made of a header and a variable-sized
-payload. The header contains information containing the time stamp associated
-with the event and the event type (an integer identifier). The event type
+payload. The header contains information such as the timestamp associated with
+the event and the event type (an integer identifier). The event type
 information allows parsing the payload and determining its size. The maximum
 slot size is bounded by the sub-buffer size. Both the number of the sub-buffers
 and their size can be configured by the \texttt{lttng} command line tool.
@@ -170,32 +171,32 @@ chapter we will analyze the kernel mechanism that enables LTTng to add a minimum
 overhead to the instrumented application during tracing or when the tracing is
 stopped.
 
-In order to trace the Linux kernel with minimum overhead and without hurting the
-performance when the tracing is disabled, the equivalent mechanism should be
-provided by the kernel. The initial approach of \textit{Kprobes}\cite{kprobes}
-Kprobes are a hardware breakpoint-based instrumentation approach. The Kprobe
-infrastructure dynamically replaces each kernel instruction to instrument with a
-breakpoint, which generates a trap each time the instruction is executed. A
-tracing probe can then be executed by the trap handler. However, due to the
-heavy performance impact of breakpoints, the inability to extract local
-variables anywhere in a function due to compiler optimizations, and the
-maintenance burden of keeping instrumentation separate from the kernel code, a
-more elaborate solution was needed.
+In order to trace the Linux kernel with minimum overhead and without hurting
+the performance when the tracing is disabled, the equivalent mechanism should
+be provided by the kernel. The initial approach was given through
+\textit{Kprobes}\cite{kprobes}. Kprobes are a hardware breakpoint-based
+instrumentation approach. The Kprobe infrastructure dynamically replaces each
+kernel instruction to instrument with a breakpoint, which generates a trap each
+time the instruction is executed. A tracing probe can then be executed by the
+trap handler. However, due to the heavy performance impact of breakpoints, the
+inability to extract local variables anywhere in a function due to compiler
+optimizations, and the maintenance burden of keeping instrumentation separate
+from the kernel code, a more elaborate solution was needed.
 
-This solution was given by Mathew Desnoyers the Linux Kernel Markers
+This solution was given by Mathew Desnoyers with the Linux Kernel Markers
 \cite{kmarkers} and Tracepoints infrastructure. The markers and tracepoints
 allow us to declare instrumentation statically at the source-code level without
 affecting performance significantly and without adding the cost of a function
 call when instrumentation is disabled. A marker placed in code provides a hook
 to call a function (probe) that can be provided at runtime. A marker can be
 `on' (a probe is connected to it) and the function is called so information is
-logged, or `off' (no probe is at- tached). When a marker is `off' it has no
+logged, or `off' (no probe is attached). When a marker is `off' it has no
 effect, except for adding a tiny time penalty (checking a condition for a
-branch). This instrumentation mechanism enables the instrumenta- tion of an
-application at the source-code level. Markers con- sists essentially of a C
+branch). This instrumentation mechanism enables the instrumentation of an
+application at the source-code level. Markers consists essentially of a C
 preprocessing macro which adds, in the instrumented function, a branch over a
 function call. By doing so, neither the stack setup nor the function call are
-ex- ecuted when the instrumentation is not enabled. At runtime, each marker can
+executed when the instrumentation is not enabled. At runtime, each marker can
 be individually enabled, which makes the branch execute both the stack setup
 and the function call 
 
@@ -230,7 +231,7 @@ synchronization mechanism. The choice made was the temporary breakpoint bypass
 \cite{bp-bypass}.
 
 In order to overcome a Kernel Markers' drawback, which was the limited type
-verification to scalar types due because its API is based on format string,
+verification to scalar types because its API is based on format string,
 \textit{Tracepoints}
 \footnote{https://www.kernel.org/doc/Documentation/trace/tracepoints.txt} were
 created.
@@ -251,10 +252,12 @@ in Listing \ref{lst:kernel-use.c}.
 \ccode{Kernel Tracepoint activation}{kernel-use.c}
 
 As far as LTTng is concerned, the traced data is entirely controlled by the
-kernel. According to \cite{desnoyer}, the kernel exposes a transport pipeline
-(Ex: character device or anonymous file descriptor) and a user space daemon
-(session daemon) simply extracts data through this mechanism. This mechanism is
-based on \texttt{DebugFS}
+kernel. However, a mechanism should be provided to interact with the userspace
+and the \texttt{lttng} tool and the session daemon. According to
+\cite{desnoyer}, the kernel exposes a transport pipeline (Ex: character device
+or anonymous file descriptor) and a user space daemon (session daemon) simply
+extracts data through this mechanism. This mechanism is based on
+\texttt{DebugFS}
 \footnote{https://www.kernel.org/doc/Documentation/filesystems/debugfs.txt}
 
 \section{User-space tracing}\label{sec:user-tracing}
@@ -264,24 +267,25 @@ like SystemTap\footnote{https://sourceware.org/systemtap/} or
 DTrace\footnote{http://dtrace.org/blogs/} based user-space tracing on
 breakpoints or system-calls whenever a tracing point is reached. However, this
 has a severe performance impact on the instrumented application and makes them
-inappropriate for system monitoring. 
+inappropriate for live tracing and system monitoring. 
 
-During BlkKin implementation, we tried to implement a custom tracing mechanism
-based on a memory-mapped ring buffer. However, this mechanism should handle with
-all the consumer-producer concurrency issues. Inspecting the LTTng user-space
-tracer, we found out that the aforementioned buffering scheme (\ref{sec:buffers}
-is implemented for user-space tracing as well. This mechanism is not based on
-breakpoints or system-calls and does not affect the system's performance. So we
-decided to base out backend on LTTng ust-trace. 
+During BlkKin' implementation, we tried to implement a custom tracing mechanism
+based on a memory-mapped ring buffer. However, this mechanism should handle
+with all the consumer-producer concurrency issues. Inspecting the LTTng
+user-space tracer, we found out that the aforementioned buffering scheme
+(\ref{sec:buffers}) with the generalized ring buffer is implemented for
+user-space tracing as well. This mechanism is not based on breakpoints or
+system-calls and does not affect the system's performance. So we decided to
+base out backend on LTTng ust-trace. 
 
-While the kernel tracer is the most complex entity in terms of code and
-algorithms, it is the simplest to handle. For the session daemon, this tracer is
-a single tracing source. However, tracing in user-space sets challenges
-concerning multiple users and concurrency. D. Goulet in his master thesis
-\cite{goulet} created the \texttt{lttng-tools} project, which provides the
-needed unified user and kernel tracing. This project handles with all the issues
-concerning multiple concurrent tracing sources and the mechanism for their
-synchronization.
+As far as LTTng is concerned, while the kernel tracer is the most complex entity
+in terms of code and algorithms, it is the simplest to handle. For the session
+daemon, this tracer is a single tracing source. However, tracing in user-space
+sets challenges concerning multiple users and concurrency. D. Goulet in his
+master thesis \cite{goulet} created the \texttt{lttng-tools} project, which
+provides the needed unified user and kernel tracing. This project handles with
+all the issues concerning multiple concurrent tracing sources and the mechanism
+for their synchronization.
 
 Since all these problems are handled by LTTng, in this section we will describe
 the mechanism behind a single tracing session.
@@ -296,7 +300,7 @@ within functions labeled with \texttt{\_\_attribute\_\_((constructor))}. The
 instrumented applications are dynamically linked with the ust libraries. So,
 when the object files are loaded, the specific code is executed and the threads
 are created. The session daemon communicates with the consumer over a
-UNIX-domain socket. Over this path pass all the control messages. For example,
+UNIX-domain socket. Over this path all the control messages pass. For example,
 over these UNIX sockets pass the file descriptors of the shared memory segment,
 so that the consumer and the instrumented application refer to the same segment.
 The elaborate buffering scheme is deployed on a shared memory segment. The
@@ -349,8 +353,6 @@ CTF offers a variety of \textit{data types} for tracing, like integers, arrays
 or strings, which are defined in the RFC. Τhese types allow inheritance so
 that other types can be derived. 
 
-So an event representation in CTF consists of 
-
 The overall structure of an event is:
 
 \begin{description}
@@ -368,11 +370,11 @@ relative to the current event. Example information: missing fields
 to a given event type
 \end{description}
 
-Each trace is associated with some metadata. For example, the trace stream
-layout description is located in the trace meta-data or the fields belonging to
-an event type are described in the event-specific meta-data. The meta-data is
-itself located in a separate stream identified by its name: `metadata'.
-
+As it became obvious, each trace is associated with some metadata. For example,
+the trace stream layout description is located in the trace meta-data or the
+fields belonging to an event type are described in the event-specific meta-data.
+The meta-data is itself located in a separate stream identified by its name:
+`metadata'.
 
 The fact that the trace metadata are located in a different stream, prevents an
 LTTng `local' trace from being read (reliably) without stopping the tracing
@@ -384,30 +386,30 @@ disk. At that point, there would be no guarantee that the lttng-sessiond would
 have had the chance to flush the updated metadata to disk. Thus, reading that
 trace would fail.
 
-So, in order to read an LTTng CTF-formatted event, LTTng created \texttt{relayd}
-and enabled live tracing, which is furthered analyzed in Section
-\ref{sec:relayd}.
+In order to read an LTTng CTF-formatted event before the end of the tracing
+session, LTTng created \texttt{relayd} and enabled live tracing, which is
+furthered analyzed in Section \ref{sec:relayd}.
 
 \section{Live tracing}\label{sec:relayd}
 
-In version 2.4.0 LTTng integrated live tracing support. Instead of waiting the
+Version 2.4.0 LTTng introduced live tracing support. Instead of waiting the
 end of the session in order to read the traces, lttng-live enabled developers to
 read the traces live while they are being created using Babeltrace. 
 
 In order to live read trace data, traces have to be streamed, even if the tracer
 and the viewer operate on the same machine. Live tracing is achieved through the
-use of special daemon called \texttt{relayd}. So, when creating the tracing
-session, you can define whether you prefer live tracing and then you have to
-provide the IP address of the realyd which runs on the remote machine. When the
-session starts, relayd stores data to the remote machine, so that they will be
-saved after the end of the session. In order to view the traces, you have to use
-Babeltrace which connects to the relayd and prints text data to the stdout, when
-they arrive over the network. Again Babeltrace can run on different machine from
-the one being traced and the one where relayd runs.
+use of special daemon called \texttt{relayd}. When creating the tracing session,
+you can define whether you prefer live tracing. If so, you have to provide the
+IP address of the computer node where realyd runs. When the session starts,
+relayd stores data to the remote machine, so that they will be saved after the
+end of the session. In order to view the traces, you have to use Babeltrace
+which connects to the relayd and prints text data to the stdout, when they
+arrive over the network. Again Babeltrace can run on different machine from the
+one being traced or the one where relayd runs.
 
 LTTng relayd handles with the previous-mentioned metadata inconsistencies.
-Whenever new events appear, when a new instrumented application is launched for
-example, the relayd updates the metadata accordingly. As a result, the viewer
+Whenever new events appear, for example when a new instrumented application is
+launched, the relayd updates the metadata accordingly. As a result, the viewer
 (Babeltrace) receives from relayd a data packet with the actual tracing
 information and an index packet to properly locate the information. The updated
 metadata are also streamed to the client in a separate stream, as already

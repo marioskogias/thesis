@@ -13,17 +13,17 @@ extracting the information needed that triggered tracing is challenging. Data
 should be correlated and only the needed parts of the logs should be isolated
 and processed in order to extract meaningful information. This requires that
 tracing data are capable of being correlated. By data correlation we refer to
-data that refer to a specific subsystem or a specific request grouping.
+data grouping concerning a specific subsystem or a specific system request.
 
 Although there have been proposed many different tracing schemes, according to
-specific applications' needs, all these schemes can be summarized into two
+specific applications needs, all these schemes can be summarized into two main
 categories. According to Google's Dapper paper\cite{dapper} these categories
 are:
 
 \begin{description}
 
 \item[black-box] schemes \cite{blackbox1, blackbox2} assume there is no
-additional information other than the message record described above, and use
+additional information other than the message record described above and use
 statistical regression techniques to infer that association.
 
 \item[annotation-based] schemes \cite{magpie, xtrace} rely on applications or
@@ -39,15 +39,15 @@ obviously, the need to manually instrument programs by adding instrumentation
 points in their source code.
 
 As mentioned, BlkKin wants to achieve an end-to-end tracing so that latencies
-and faults between the different subsystem layers to become obvious. So, we
-decided to use an annotation-based tracing schema.
+and faults between the different subsystem layers to become obvious.
+Consequently, we decided to use an annotation-based tracing schema.
 
 \section{Dapper tracing concepts}\label{sec:dapper}
 
 Dapper\cite{dapper} is a large scale distributed systems tracing infrastructure
 created by Google. It uses an annotation-based tracing scheme, which enables
-Google developers to monitor Google infrastructure only by instrumenting a small
-set of common libraries (RPC system, control flow). Although it is closed
+Google developers to monitor Google' infrastructure only by instrumenting a
+small set of common libraries (RPC system, control flow). Although it is closed
 source, the tracing semantics used in Dapper are publicly available and have
 been used in BlkKin's development. Indeed, Google proposed a complete
 annotation-based scheme, which describes the following concepts for tracing:
@@ -75,7 +75,7 @@ trace, parent span id is used. Spans without a parent span ids are  known as
 
 The previous concepts fit out demands for end-to-end tracing. So, we implemented
 them in a tracing library for C/C++ applications, which is described thoroughly
-in Chapter \ref{}.
+in Section \ref{sec:contribution}.
  
 \section{Zipkin: a Dapper open-source implementation}\label{sec:zipkin}
 
@@ -90,37 +90,43 @@ some of them, instead of rewriting the needed subsystems, we decided to use
 
 Zipkin\footnote{http://twitter.github.io/zipkin/} is an open-source
 implementation of the Dapper paper by Twitter. It is used to gather timing data
-for all the disparate services at Twitter. It manages both the collection and
-lookup of this data through a Collector and a Query service as well as the data
-presentation through a Web UI. Zipkin is written in Scala, while the UI is
-written in Ruby and Javascript using the D3.js\footnote{http://d3js.org/}
-framework. So, Zipkin is a full-stack systems that encapsulates the Dapper
-tracing semantics out of the box. This is why we chose to use Zipkin.
+for all the disparate services at Twitter. It manages with both the collection
+and lookup of this data through a Collector and a Query service as well as the
+data presentation through a Web UI. Zipkin is written in Scala, while the Web
+interface is written in Ruby and Javascript using the
+D3.js\footnote{http://d3js.org/} framework. So, Zipkin is a full-stack system
+that encapsulates the Dapper tracing semantics out of the box. This is why we
+chose to use Zipkin.
 
 Concerning transportation, Zipkin uses Scribe, which enables Zipkin to Scale.
-So, in order to feed Zipkin with data a Scribe client is needed. As metioned in
-Chapter \ref{sec:logging-bkg} about Scribe, a category and a message is needed
-to log to Scribe. Zipkin messages are also Thrift encoded so that the collector
-and treat them and add them in the database. Zipkin thrift messages are encoded
-according to the following thrift file (Listing \ref{lst:zipkin.thrift}) 
+So, in order to feed Zipkin with data a Scribe client is needed. As mentioned
+in Chapter \ref{sec:logging-bkg} about Scribe, a category and a message is
+needed to log to Scribe. Zipkin messages themselves are also Thrift encoded so
+that the collector can handle them and add them in the database. Zipkin thrift
+messages are encoded according to the following thrift file (Listing
+\ref{lst:zipkin.thrift}) 
 
 This thift file defines:
 
 \begin{description}
-\item[Endpoint] is the location when an annotation took place. An endpoint is
-identified by its name, ip and port.
+\item[Endpoint] is the location where an annotation took place. An endpoint is
+identified by its name, IP and port.
 \item[Annotation] is the tracing information itself, exactly like the Dapper
 annotation
-\item[Span] is also the Dapper span identified by its name, id, trace and parent
-ids and can contain multiple annotations.
+\item[Span] is also the Dapper span identified by its name, span, trace and
+parent ids and can contain multiple annotations.
 \end{description} 
 
 \ccode{Zipkin message thrift definition file}{zipkin.thrift}
 
 Concerning the final data storage Zipkin provides various choices including SQL
 databases like SQLite, MySQL, and PostgreSQL as well as NoSQL databases like
-Cassandra and even Redis. However, like Twitter, we preferred to use Cassandra
-for our installation because of its performance.
+Cassandra and even Redis. Twitter suggests using Cassandra in Zipkin
+installations. They support that it performs well. However, Cassandra imposes
+limitations concerning ad-hoc queries. So we used Zipkin both with Cassandra and
+MySQL based on experiment and the information we wanted to extract.
 
-So, the resulting Zipkin architecture can be seen in Figure
-\ref{fig:zipkin-architecture.png}
+The resulting Zipkin architecture can be seen in Figure
+\ref{fig:zipkin-architecture.png}. Although we did not use it, Twitter
+encourages using Zookeeper for trace synchronization purposes. However, in our
+case and scale there was no such need.

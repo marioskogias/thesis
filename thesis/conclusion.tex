@@ -6,17 +6,18 @@ This thesis handles with the problem of low overhead distributed tracing aimed
 to analyze software defined storage systems. In this kind of multi-layered
 software architectures finding and locating bottlenecks and potential or even
 real faults is pretty challenging because of their complexity. After evaluating
-both various logging and tracing mechanism as well as different tracing schemas,
-we decided to implement our own tracing infrastructure called BlkKin. BlkKin is
-based on opensource technologies, namely LTTng and Zipkin, and implements the
-tracing semantics used by Google's Dapper tracing infrastructure. So BlkKin is a
-low-overhead tracing infrastructure that enables live tracing for applications
-written in C/C++ and provides two distinct user interfaces, so that the end user
-can take real time information about the system.
+both various logging and tracing mechanism as well as different tracing
+schemas, we decided to implement our own tracing infrastructure called BlkKin.
+BlkKin is based on opensource technologies, specifically LTTng and Zipkin, and
+implements the tracing semantics used by Google's Dapper tracing
+infrastructure. So BlkKin is a low-overhead tracing infrastructure that enables
+live tracing for applications written in C/C++ and provides two distinct user
+interfaces, so that the end user can take real time information about the
+system.
 
 In order to accomplish this endeavour, we had to work with the LTTng community
-and extend their software so that it can communicate with Zipkin and create an
-instrumentation library for easy application instrumentation.
+and extend their software so that it can communicate with Zipkin. We also,
+created an instrumentation library for easy application instrumentation.
 
 As a proof of concept for our system, we instrumented Archipelago and RADOS
 source code. Consequently, we were able to track an IO request's route from the
@@ -29,7 +30,7 @@ faults.
 However, this work was just the beginning of cross-layered distributed tracing,
 since it provided the framework for further investigation. Our mechanism can be
 used in any kind of low-overhead application that needs a tracing and
-visualization infrastructure.  So, far the Ceph community has showed interest
+visualization infrastructure. So, far the Ceph community has showed interest
 for BlkKin and we are in close contact so that BlkKin can become the main
 tracing infrastructure for RADOS. 
  

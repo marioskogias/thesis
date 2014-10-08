@@ -33,11 +33,14 @@ creates a new \texttt{struct blkin\_trace\_info}, it also creates a
 on to the other library operations. 
 
 After the above structs creation, the instrumented application could either
-create annotations (Listing \ref{lst:blkin-record.h}), or create a
-\textit{child} (Listing \ref{lst:blkin-child.h}) of the current span. We have to
-mentioned that there is also a C++ wrapper for these function calls, but is
-omitted since it shares exactly the same logic but implemented in an
-object-oriented way.
+create annotations (Listing \ref{lst:blkin-record.h}) either timestamp or
+key-value. Also, based on the instrumentation, the library enables the
+programmer to create a \textit{child} span (Listing \ref{lst:blkin-child.h}),
+based on the information of the current span, namely a span with the same trace
+id, a different span id and a parent span id which is the same with the previous
+span id. We have to mentioned that there is also a C++ wrapper for these
+function calls, but is omitted since it shares exactly the same logic but
+implemented in an object-oriented way.
 
 \cccode{BlkKin child actions}{blkin-child.h}
 \cccode{BlkKin annotations}{blkin-record.h}
@@ -47,10 +50,14 @@ per computer node, but per cluster as well, since we plan to implement
 distributed tracing. For our implementation, these ids are \texttt{uint\_64}
 numbers that are randomly generated. In order to have a simple implementation,
 we use \texttt{rand()}. However, the normal procedure to feed it with the
-current timestamp failed for us, since we has multiple processes starting almost
-simultaneously on the same host and this resulted in all these services taking
-the same feed and producing the same ids. Instead, we feed \texttt{srand()} by
-reading from \texttt{\textbackslash dev\textbackslash urandom}.
+current timestamp failed for us, since we have multiple processes starting
+almost simultaneously on the same host and this resulted in all these services
+taking the same feed and producing the same ids. Instead, we feed
+\texttt{srand()} by reading from \texttt{\textbackslash dev\textbackslash
+urandom}, so each process gets at least different initial feed for the random
+generator.
+
+\section{LTTng tracing backend}
 
 After having defined the above API, we had to provide an implementation which is
 going to be based on LTTng. LTTng is activated only whenever the fucntion
@@ -61,12 +68,14 @@ calls. These calls are predefined in a header file. This header file is used by
 LTTng to create the methods bodies and the object file which is finally linked
 to the final BlkKin object file, which in turn is linked with the instrumented
 application. In Listing \ref{lst:zipkin_trace.h} you can see how we defined the
-tracepoint for the key-value annotations. In this proof-of-concept version
-of BlkKin, all the tracepoints are considered WARNINGS, and the severity level
-configured is such, so that all of them are eventually logged. To avoid
-repetition, in the Listing only the key-value tracepoint is illustrated. The
-timestamp tracepoint is the same, but instead of key-value information, we have
-the event name.
+tracepoint for the key-value annotations. To avoid repetition, in the Listing
+only the key-value tracepoint is illustrated. The timestamp tracepoint is the
+same, but instead of key-value information, we have the event name. These
+tracepoint function calls are defined in such a way that they include all the
+necessary information for Dapper tracing, such as trace ids. In this
+proof-of-concept version of BlkKin, all the tracepoints are considered WARNINGS,
+and the severity level configured is such, so that all of them are eventually
+logged.
 
 \ccode{BlkKin tracepoints}{zipkin_trace.h}
 
@@ -74,13 +83,13 @@ LTTng assigns a timestamp to every event it records, so in case of the
 timestamp events we do not need to care about timing information by calling
 \texttt{gettimeofday()} for example. Instead, LTTng makes use of
 \texttt{CLOCK\_MONOTONIC}, which is transformed to real timestamp during the
-reading process in Babeltrace. As part of the CTF metadata LTTng also sends the
-timestamp and the monotonic value from the time the session started, so that
+reading process in Babeltrace. As part of the CTF metadata, LTTng also sends the
+timestamp and the monotonic value of the time when the session started, so that
 the real timestamp can be formed during reading.
 
-As far as the sampling is concerned, in order not to trace all the requests, one
-has to export an environmental variable called \texttt{RATE}. This variable is
-an integer N which indicates that 1/N calls to \texttt{blkin\_init\_new\_trace}
+As far as sampling is concerned, in order not to trace all the requests, one has
+to export an environmental variable called \texttt{RATE}. This variable is an
+integer N which indicates that 1/N calls to \texttt{blkin\_init\_new\_trace}
 should actually create a new trace. This way we can regulate the amount of
 traces we produce.
 
@@ -94,7 +103,7 @@ used \texttt{dlopen} \texttt{dlsym} and manually load the BlkKin functions which
 in turn load the LTTng object file and create the needed threads whenever the
 function \texttt{blkin\_init()} is called.
 
-To sum up, we site an execution example in Listing \ref{lst:blkin-example.c} and
+To sum up, we cite an execution example in Listing \ref{lst:blkin-example.c} and
 its Makefile in Listing \ref{lst:Makefile}.
 
 \ccode{BlkKin example Makefile}{Makefile}
@@ -107,21 +116,21 @@ convert CTF data to Scribe messages and send them to the Scribe server. As
 mentioned, we implemented two different plugins one generic that sends JSON data
 to Scribe and one Zipkin-specific that creates Scribe messages that end up to
 Zipkin. Since Scribe messages are simple strings after all, both plugins share a
-common core that handles with the connections and message transportation. Each
-plugin implements a different message formation part which results to a string
-message to be sent to Scribe.
+common core that handles with the Scribe connection and message transportation.
+Each plugin implements a different message formation part which results to a
+string message to be sent to Scribe.
 
-First we will explain how we extract the tracing information. Babeltrace
-exposes a Python library which is created using
-swig2.0\footnote{http://www.swig.org/}.  According to this library, in order to
-read the CTF data you have to create a \texttt{Tracecollection} object and call
-the method \texttt{add\_trace} on it passing the trace path. After that, a
-Python generator is created in \texttt{Tracecollection.events}. If we iterate
-over that generator, we can take the CTF event trace information formated as a
-Python object which has properties like the event name and the timestamp and
-another generator that returns the event information in the form of a tuple
-(item-name, item-value), namely the values passed to the \texttt{tracepoint}
-function call. After that we can manipulate the data the way we want.
+First we will explain how we extract the tracing information. Babeltrace exposes
+a Python library which is created using swig2.0\footnote{http://www.swig.org/}.
+According to this library, in order to read the CTF data you have to create a
+\texttt{Tracecollection} object and call the method \texttt{add\_trace} on it
+passing the trace path. After that, a Python generator is created in
+\texttt{Tracecollection.events}. If we iterate over that generator, we can take
+the CTF event trace information formated as a Python object which has properties
+such as the event name and the timestamp as well as another generator that
+returns the event information in the form of a tuple (item-name, item-value),
+namely the values passed to the \texttt{tracepoint} function call. After that we
+can manipulate the data the way we want.
 
 The case of the JSON format is easy since after that we can easily create a
 Python dictionary and transform it into a JSON object which is ready to be
@@ -131,12 +140,15 @@ feed data to Zipkin the procedure is different. As mentioned in Section
 representation of the events and the Thrift file used can be found in Listing
 \ref{lst:zipkin.thrift}. So, in order to create these messages, we used Thrift
 to create the Python code from the Zipkin Thrift file. Thrift created the Python
-classes needed. So, when obtained the tracing information with the method
-mentioned above, we passed them to the classes constructors and created the
+classes needed. So, when we obtained the tracing information with the method
+mentioned above, we passed them to the class constructors and created the
 equivalent \texttt{Span}, \texttt{Annotation} and \texttt{Endpoint} objects.
 After that each span is encoded using the Thrift \texttt{TBinaryProtocol} and
 this value, in order to become a string, is base64 encoded. After this
-procedure, we have the final string to forward to Scribe.
+procedure, we have the final string to forward to Scribe. However, we should
+mention that the use of the BlkKin plugin is possible only when the BlkKin
+library was been used for application instrumentation and is not a
+general-purpose plugin.
 
 After having formatted the messages, we have to send them to Scribe. To do that
 we used the Python module \texttt{facebook-scribe} from \texttt{pip}. Sending a
@@ -147,45 +159,42 @@ message to Scribe is as simple as it seen in Listing \ref{lst:scribe.py}.
 In case we want to annotate on a subsystem that does not have distinct beginning
 and end, Zipkin provides some special annotations that are used to start and end
 a span. They are used only for instrumentation and visualization purposes.
-However, using these annotations annotations we can be sure that a span has
-ended and then forward a packed message to Scribe, namely a message that
+However, by using these annotations we can be sure that a span has
+ended and then forward the packed message to Scribe, namely a message that
 includes multiple annotations. This reduces the number of messages and
 consequently the network traffic and the server load. Depending on the
 instrumentation this may not be possible when having a span that collects
 annotations from multiple computer nodes in cases of distributed traces. So, the
-Zipkin plugin has the option to collect annotations, temporarily stored them in
+Zipkin plugin has the option to collect annotations, temporarily store them in
 a dictionary using as a key the trace and span id pair and when a predefined
 annotation is asked to be logged then create a message including all the
 annotations for this specific span. In case this is not possible, the plugin
 just creates single-annotation messages and forwards them to Scribe.
 
-\section{BlkKin Live tracing}
+\section{BlkKin Live tracing}\label{sec:bbl-live}
 Although, as already mentioned, the solution we gave for live tracing is only
-termporary since Babeltrace is under code refactoring at this specific moment
-and after this the above plugins will operate with the live tracing as well, for
-completion reasons, in this section we explain how we implemented live tracing
-for BlkKin.
+termporary, in this section we explain how we implemented live tracing in BlkKin
+for reasons of completeness. This solution probably will be abandoned when
+Babeltrace refactoring is over. Then, the above plugins will operate with the
+live tracing as well.
 
-Babeltrace is a CTF-to-text converter written in C. Instead of text we wanted to
-produce Scribe messages. So, at first we tried to implement this functionality
-within Babeltrace. For this reason we needed to implement a Scribe client
-written in C. Although we created a working prototype of Babeltrace sending
-messages to Scribe, this idea was abandoned after the urge of my GSoC mentor and
-started working with the plugins. Although we could redirect Babeltrace output
-to a process that would create the Scribe messages, we chose to avoid this
-CTF-to-text and text-to-Scribe conversion. Instead, we created a version of
-Babeltrace especially for BlkKin. This version instead of reading generic
-CTF-events is aware of the events' content as described in
-\ref{lst:zipkin_trace.h}. Consequently, instead of iterating over the CTF trace
-for generic events, this version of Babeltrace extracts the included information
-and creates a C-struct with them as seen in Listing \ref{lst:babeltrace-live.h} 
+As mentioned, Babeltrace offers only CTF-to-text transformations for live
+tracing. Although we could redirect Babeltrace text output to a process that
+would create the Scribe messages, we chose to avoid this CTF-to-text and
+text-to-Scribe conversion. Instead, we created a version of Babeltrace
+especially for BlkKin. This version instead of reading generic CTF-events is
+aware of the events' content as described in \ref{lst:zipkin_trace.h}.
+Consequently, instead of iterating over the CTF trace for generic events, this
+version of Babeltrace extracts the included information and creates a C-struct,
+as seen in Listing \ref{lst:babeltrace-live.h}, including all the necessary
+information to create a Zipkin message.
 
 \ccode{Babeltrace live struct}{babeltrace-live.h}
 
 After that this struct is forwarded to a Unix pipe. On the other side of the
 pipe there is a Python process. This process makes use of Python
 ctypes\footnote{https://docs.python.org/2/library/ctypes.html}. So whenever a
-struct is read, a Python object is created and from that point the Python
+struct is read, a Python object is created and from that point, the Python
 consumer reuses the Zipkin Babeltrace plugin code to create the equivalent Span,
 Annotation and Endpoint objects and finally send the base64-encoded message to
 Scribe.
@@ -195,15 +204,17 @@ Scribe.
 \subsection{BlkKin monitoring tool}
 As we mentioned in the design part, Zipkin covered a basic need for the user
 interface with its Web UI. However, this specific UI can be used mostly for
-trace visualization and not as a tool that can be used to detect abnormalities.
-Thus, we created a simple Python-django application. In this proof-of-concept
-implementation, this application communicates with the Zipkin databse which is a
-MySQL database. It queries the database for aggregate and average information
-that depict the cluster state over the last N minutes. After that either using a
-threshold for these values or judging on other criteria, it illustrates this
-information as green when everything is working properly, or red when there is a
-possible anomaly. There screenshots of this tool in the evaluation part
-(\ref{}).
+trace visualization and not as a tool that can be used to detect abnormalities,
+fault or as an alerting mechanism.  Thus, we created a simple Python-django
+application. In this proof-of-concept implementation, this application
+communicates with the Zipkin databse which is a MySQL database. We chose MySQL
+so that we can make any kind of ad-hoc queries, avoiding schema-less options
+like Cassandra. The application queries the database for aggregate and average
+information that depict the cluster state over the last N minutes. After that
+either using a threshold for these values or judging on other criteria, it
+illustrates this information as green when everything is working properly, or
+red when there is a possible anomaly. There screenshots of this tool in the
+evaluation part (Section \ref{sec:failures}).
 
 \subsection{Hadoop}
 Scribe can be configured to store the data it receives in HDFS. So, we used
@@ -213,22 +224,29 @@ post-processing the tracing data in order to locate the thresholds and metrics
 used in the BlkKin monitoring tool. After that BlkKin can use sampling and send
 data to Zipkin.
 
-In our described configuration, if we use the JSON Babeltrace plugin we end up
-having JSON data in the HDFS which can be manipulated easily with Map-Reduce
-jobs. However, if we use the Zipkin Babeltrace plugin, then in the HDFS we have
-multiple files containing base64 encoded strings. In order to extract the
-information wanted through Map-Reduce, we had to decode this information
-following the opposite direction. Again using Thrift and the Zipkin Thrift
-file we created the equivalent Java code which created the Annotation, Span and
-Endpoint classes in Java. Then after reading from HDFS, we base64 decoded the
-strings and then TBinaryProtocol decoded them. After that we could create the
-Span object. Since most of the data we wanted to extract where the duration
-between two specific annotations, we created a simple Java interface to help us.
-Whenever a Span with multiple annotations was read we had to define whether to
-keep the span or not and then to forward the annotation to the reducers or not.
-Then a key-value pair (id, timestamp) was emitted. The reducer's job was just to
-subtract the two different values belonging to the same id. This id is a string
-and its creation is also defined by the interface. The interface can be seen in
-Listing \ref{lst:interface.java} and its up to the user how to implement it.
+Based on the plugin used, different kind of data ends up in HDFS. If we use the
+JSON Babeltrace plugin we end up having JSON data in the HDFS which can be
+manipulated easily with Map-Reduce jobs. However, if we use the Zipkin
+Babeltrace plugin, then in the HDFS we have multiple files containing base64
+encoded strings. In order to extract the information wanted through Map-Reduce,
+we had to decode this information following the opposite direction. Again using
+Thrift and the Zipkin Thrift file we created the equivalent Java code which
+created the Annotation, Span and Endpoint classes in Java. Then after reading
+from HDFS, we base64 decoded the strings and then TBinaryProtocol decoded them.
+After that we could create the Span object. Since most of the data we wanted to
+extract where the duration between two specific annotations, we created a simple
+Java interface to help us. The interface can be seen in Listing \ref{lst:interface.java}
+and its up to the user how to implement it.
+This interface can be implemented either by the
+Mapper or by a class used by the Mapper used to pick the right annotations.
+Whenever a Span with including annotations is read we have to define whether to
+keep the span or not. The same decision has to be made for the included
+annotations in case we keep the span. The timestamp of the kept annotations will
+be then forwarded to reducers. This will happen in the form of a key-value pair
+(id, timestamp). The reducer's job is just to subtract the two different values
+belonging to the same id. This id is a string and its creation is also defined
+by the interface. For our case we needed to create Map-Reduce jobs that compute
+average durations and it was really easy to do so using the interface and the
+Thrift-produced Java code.
 
 \ccode{Hadoop interface}{interface.java}
