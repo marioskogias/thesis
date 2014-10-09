@@ -1,0 +1,74 @@
+\subsection{Tracing backend}
+
+\begin{frame}{Tracing}
+\begin{exampleblock}{}
+  {``Tracing is a specialized use of logging to record information about a
+program's execution''}
+  \vskip5mm
+  \hspace*\fill{\small Wikipedia}
+\end{exampleblock}
+\hfill \\
+\hfill \\
+Tracing characteristics:
+\begin{itemize}
+\item Tracing can be low level (eg. kernel tracing, access to preformance
+counters)
+\item Tracing has mostly debuggin purposes and performance tuning
+\item Tracing may produce notoriously bulky output
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Tracing Systems}
+\setbeamertemplate{description item}[align left]
+\begin{description}
+\item[DTrace] \hfill \\
+Released by Sun Microsystems in 2005
+\item[SystemTap] \hfill \\
+Released by Red Hat in 2005
+\end{description}
+
+Advantages:
+\begin{itemize}
+\item Dynamic Instrumentation
+\item User and kernel tracing
+\end{itemize}
+
+\hfill \\
+Disadvantages:
+\begin{itemize}
+\item User tracing is based or system calls or breakpoints
+\item Significant performance overhead
+\item Inappropriate for live tracing
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Linux Trace Toolkit - next generation}
+\includegraphics[scale=0.08]{images/lttng-logo.png}
+\begin{itemize}
+\item successor of Linux Trace Toolkit
+\item Mathew Desnoyer’s PhD dissertation  in École Polytechnique de Montréal
+\item maintained by EfficiOS Inc1and the DORSAL lab in École Polytechnique de
+Montréal.
+\item Unified user and kernel tracing
+\item Low overhead tracing based on Tracepoints
+\item Static instrumentation
+\item Live tracing
+\end{itemize}
+\end{frame}
+
+\subsection{LTTng}
+
+\begin{frame}{LTTng Architecture}
+\begin{center}
+\includegraphics[scale=0.3]{images/lttng-arch.png}
+\end{center}
+\end{frame}
+
+\begin{frame}{UST architecture}
+\begin{center}
+\includegraphics[scale=0.5]{images/ust-architecture.png}
+\end{center}
+\end{frame}
+
+\begin{frame}{CTF and Babeltrace}
+\end{frame}
