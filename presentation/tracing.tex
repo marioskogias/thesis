@@ -11,9 +11,9 @@ program's execution''}
 \hfill \\
 Tracing characteristics:
 \begin{itemize}
-\item Tracing can be low level (eg. kernel tracing, access to preformance
+\item Tracing can be low level (eg. kernel tracing, access to performance
 counters)
-\item Tracing has mostly debuggin purposes and performance tuning
+\item Tracing has mostly debugging purposes and performance tuning
 \item Tracing may produce notoriously bulky output
 \end{itemize}
 \end{frame}
@@ -70,5 +70,30 @@ Montréal.
 \end{center}
 \end{frame}
 
-\begin{frame}{CTF and Babeltrace}
+\begin{frame}{CTF}
+Common Trace Format:
+\hfill \\
+\begin{itemize}
+\item Aimed to cover tracing needs from versatile communities
+\item Collaboration between the Multicore association and the Linux Community
+\item Based on Trace Stream Description Language
+\item Separation between data and metadata
+\item Separation between event and event-context
+\item Variety of data types and type inheritance
+\item Live tracing
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Babeltrace}
+\begin{itemize}
+\item Trace reader/writer
+\item Trace converter
+\item Babeltrace plugins
+\item Exports \texttt{libbabeltrace}
+\item Python bindings
+\end{itemize}
+\hfill \\
+\hfill \\
+Complete environments based on Babeltrace: Trace Compass (Java tool), Eclipse
+LTTng plugin
 \end{frame}

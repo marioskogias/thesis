@@ -2,7 +2,6 @@
 \usepackage{amsmath}
 \usepackage{graphicx}
 \makeatletter
-
 \usepackage{listings}
 %\usetheme{Boadilla}
 \usetheme{Warsaw}
@@ -27,6 +26,18 @@
 \usecolortheme[RGB={23,51,104}]{structure}
 
 \usepackage{babel}
+%\useoutertheme{infolines}
+\setbeamertemplate{headline}
+{%
+  \leavevmode%
+  \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.5ex,dp=2ex]{section in head/foot}%
+    \hbox to .5\paperwidth{\hfil\insertsectionhead\hfil}
+  \end{beamercolorbox}%
+  \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.5ex,dp=2ex]{subsection in head/foot}%
+    \hbox to .5\paperwidth{\hfil\insertsubsectionhead\hfil}
+  \end{beamercolorbox}%
+  \vskip0pt%
+}
 
 \begin{document}
 
@@ -44,4 +55,7 @@ for software-defined storage systems}
 \include{motivation}
 \include{background}
 \include{tracing}
+\include{blkin}
+\include{evaluation}
+\include{conclusion}
 \end{document}
