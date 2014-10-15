@@ -53,11 +53,53 @@ for software-defined storage systems}
   School of Electrical and Computer Engineering
 }
 
-\include{intro}
-\include{motivation}
-\include{background}
-\include{tracing}
-\include{blkin}
-\include{evaluation}
-\include{conclusion}
+\begin{frame}{Zipkin UI}
+\begin{center}
+ \makebox[\textwidth][c]{
+        \includegraphics[width=\paperwidth]{images/zipkin-overview.png}
+}
+\end{center}
+\end{frame}
+
+\begin{frame}{Zipkin UI - Annotations}
+\begin{center}
+ \makebox[\textwidth][c]{
+        \includegraphics[width=\paperwidth]{images/zipkin-annotations.png}
+}
+\end{center}
+\end{frame}
+
+\begin{frame}{Zipkin UI - Dependencies}
+\begin{center}
+ \makebox[\textwidth][c]{
+        \includegraphics[width=\paperwidth]{images/zipkin-depend.png}
+}
+\end{center}
+\end{frame}
+\begin{frame}{Network fault}
+\begin{center}
+ \makebox[\textwidth][c]{
+        \includegraphics[width=\paperwidth,
+height=0.5\paperheight]{images/network-error.png}
+}
+ \makebox[\textwidth][c]{
+        \includegraphics[width=\paperwidth,
+height=0.33\paperheight]{images/network-error-blkin.png}
+}
+\end{center}
+\end{frame}
+
+
+\begin{frame}{Disk fault}
+\begin{center}
+ \makebox[\textwidth][c]{
+        \includegraphics[width=\paperwidth,
+height=0.5\paperheight]{images/disk-fault.png}
+}
+ \makebox[\textwidth][c]{
+        \includegraphics[width=\paperwidth,
+height=0.33\paperheight]{images/disk-fault-blkin.png}
+}
+\end{center}
+\end{frame}
 \end{document}

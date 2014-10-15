@@ -7,7 +7,7 @@ FILE=presentation
 export TEXINPUTS:=${PWD}/Styles//:${TEXINPUTS}
 export BSTINPUTS:=${PWD}/Styles//:${BSTINPUTS}
 
-all: $(FILE).pdf
+all: $(FILE).pdf backup.pdf
 
 %.pdf: %.tex FORCE
 	latexmk -pdf -f -e '$$pdflatex=q/xelatex %O %S/' $<

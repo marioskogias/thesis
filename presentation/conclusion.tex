@@ -1,14 +1,34 @@
 \section{Conclusion}
 
-\begin{frame}{Summarizing}
-BlkKin:
+\begin{frame}[t]{Outline}
+\setcounter{tocdepth}{1}
+\tableofcontents[currentsection]
+\end{frame}
+
+\begin{frame}{Assumptions}
+In order to make BlkKin a valuable working system we had to:
 \hfill \\
 \hfill \\
 \begin{itemize}
-\item end-to-end tracing infrastructure
-\item based on Zipkin and LTTng
-\item targeting storage systems tracing
-\item used in QEMU, Archipelago and RADOS instrumentation
+\item Understand cutting-edge opensource technologies used in the industry
+\item Combine and extend them
+\item Use BlkKin in a production scale system, Archipelago and RADOS
+%\item end-to-end tracing infrastructure
+%\item based on Zipkin and LTTng
+%\item targeting storage systems tracing
+%\item used in QEMU, Archipelago and RADOS instrumentation
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Future Plans}
+\begin{itemize}
+\item Use BlkKin as official RADOS tracing infrastructure
+\hfill \\
+\hfill \\
+\item Use BlkKin in other low-overhead systems
+\hfill \\
+\hfill \\
+\item Merge Babeltrace plugins in the LTTng source tree
 \end{itemize}
 \end{frame}
 

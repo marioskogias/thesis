@@ -1,4 +1,10 @@
 \section{BlkKin Evaluation}
+
+\begin{frame}[t]{Outline}
+\setcounter{tocdepth}{1}
+\tableofcontents[currentsection]
+\end{frame}
+
 \subsection{Overview}
 \begin{frame}{Evaluation Environment}
 Instrumented:
@@ -11,38 +17,22 @@ Instrumented:
 \hfill \\
 Testbed:
 \begin{itemize}
-\item 2 hosts LAN interconnected
+\item 2 hosts interconnected over LAN
 \item 2 OSDs per host
 \item 1 host running QEMU and Archipelago
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Zipkin UI}
+\begin{frame}{Zipkin in Action}
+\hfill \\
 \begin{center}
- \makebox[\textwidth][c]{
-        \includegraphics[width=\paperwidth]{images/zipkin-overview.png}
-}
+{\Large Zipkin Demo}
 \end{center}
 \end{frame}
 
-\begin{frame}{Zipkin UI - Annotations}
-\begin{center}
- \makebox[\textwidth][c]{
-        \includegraphics[width=\paperwidth]{images/zipkin-annotations.png}
-}
-\end{center}
-\end{frame}
-
-\begin{frame}{Zipkin UI - Dependencies}
-\begin{center}
- \makebox[\textwidth][c]{
-        \includegraphics[width=\paperwidth]{images/zipkin-depend.png}
-}
-\end{center}
-\end{frame}
 \subsection{Metrics}
-\begin{frame}{IO Loads - Scenarios}
-IO loads created within VM using \texttt{fio}:
+\begin{frame}{I/O Loads - Scenarios}
+I/O loads created within VM using \texttt{fio}:
 \begin{itemize}
 \item 4k random writes
 \item 64k sequential writes
@@ -59,11 +49,12 @@ Scenarios:
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Bandwidth Overhead}
+\begin{frame}[t]{Bandwidth Overhead}
+\begin{center}
 \begin{columns}
     \begin{column}{0.5\textwidth}
         \begin{center}
-            \includegraphics[scale=0.3]{images/64.png}
+            \includegraphics[scale=0.3]{images/4.png}
         \end{center}
     \end{column}
     \begin{column}{0.5\textwidth}
@@ -72,6 +63,7 @@ Scenarios:
         \end{center}
     \end{column}
 \end{columns}
+\end{center}
 \end{frame}
 
 \subsection{Detecting Problems}
@@ -84,7 +76,7 @@ Scenarios:
 \item Simulate faulty environment:
     \begin{itemize}
     \item Network faults: using \texttt{tc}
-    \item Disk faults: adding extra IO load using \texttt{fio}
+    \item Disk faults: adding extra I/O load using \texttt{fio}
     \end{itemize}
 \hfill \\
 \hfill \\
@@ -93,14 +85,20 @@ Scenarios:
 \end{frame}
 
 \begin{frame}{Network fault}
-\begin{center}
  \makebox[\textwidth][c]{
         \includegraphics[width=\paperwidth,
-height=0.5\paperheight]{images/network-error.png}
+height=0.6\paperheight]{images/network-error.png}
 }
+\end{frame}
+
+\begin{frame}{Network fault}
+\begin{center}
+% \makebox[\textwidth][c]{
+%        \includegraphics[width=\paperwidth,
+%height=0.5\paperheight]{images/network-error.png}
+%}
  \makebox[\textwidth][c]{
-        \includegraphics[width=\paperwidth,
-height=0.33\paperheight]{images/network-error-blkin.png}
+        \includegraphics[width=\paperwidth, keepaspectratio=true]{images/network-error-blkin.png}
 }
 \end{center}
 \end{frame}
@@ -108,13 +106,12 @@ height=0.33\paperheight]{images/network-error-blkin.png}
 
 \begin{frame}{Disk fault}
 \begin{center}
+% \makebox[\textwidth][c]{
+%        \includegraphics[width=\paperwidth,
+%height=0.5\paperheight]{images/disk-fault.png}
+%}
  \makebox[\textwidth][c]{
-        \includegraphics[width=\paperwidth,
-height=0.5\paperheight]{images/disk-fault.png}
-}
- \makebox[\textwidth][c]{
-        \includegraphics[width=\paperwidth,
-height=0.33\paperheight]{images/disk-fault-blkin.png}
+        \includegraphics[width=\paperwidth,keepaspectratio=true]{images/disk-fault-blkin.png}
 }
 \end{center}
 \end{frame}

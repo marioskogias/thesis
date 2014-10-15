@@ -1,5 +1,10 @@
 \section{Motivation}
 
+\begin{frame}[t]{Outline}
+\setcounter{tocdepth}{1}
+\tableofcontents[currentsection]
+\end{frame}
+
 \subsection{Archipelago}
 \begin{frame}{VM Volume storage}
 \begin{center}
@@ -37,35 +42,37 @@ A thin distributed storage layer aiming to:
 \subsection{Distributed storage}
 
 \begin{frame}{RADOS}
-is the block storage component of Ceph 
+is the storage component of Ceph 
 \hfill \\
 \hfill \\
+Ceph is a distributed object store and filesystem. 
 \hfill \\
 \hfill \\
 
 RADOS basic characteristics are:
 \begin{itemize}
-\item \textit{Replication}
-\item \textit{Fault tolerance}
-\item \textit{Self-management}
-\item \textit{Scalability}\end{itemize}
+\item Replication
+\item Fault tolerance
+\item Self-management
+\item Scalability
+\end{itemize}
 \end{frame}
 
 
 \begin{frame}{Storage Abstraction}
 \begin{center}
-    \includegraphics[scale=0.4]{images/object_storage_arch.png} \\
+    \includegraphics[scale=0.3]{images/rados_abstraction.png} \\
 \end{center}
 \end{frame}
 
 \subsection{BlkKin}
 \begin{frame}{The Problem}
 \begin{itemize}
-\item Complex service oriented architectures
-\item Difficult debugging
-\item Difficult monitoring
+\item Complex service-oriented architectures
+\item Difficult to debug
+\item Difficult to monitor
 \item Non-deterministic execution
-\item Context-bound faults
+\item Context-dependent faults
 \end{itemize}
 \end{frame}
 
@@ -83,13 +90,13 @@ Central data collection
 
 \begin{frame}{BlkKin}
 
-A distributed tracing infrastructure to track the IO request from Qemu until
+A distributed tracing infrastructure to track the I/O request from QEMU until
 RADOS
 \hfill \\
 \hfill \\
 \hfill \\
 
-BlkKin main characteristics:
+BlkKin's main characteristics:
 \begin{itemize}
 \item low-overhead tracing 
 \item live-tracing

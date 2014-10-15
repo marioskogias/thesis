@@ -1,5 +1,10 @@
 \section{Background}
 
+\begin{frame}[t]{Outline}
+\setcounter{tocdepth}{1}
+\tableofcontents[currentsection]
+\end{frame}
+
 \begin{frame}{Main Challenges}
 \begin{itemize}  \itemsep50pt
 \item Meaningful and easily correlated tracing data
@@ -28,10 +33,10 @@ request.
 
 \subsection{Dapper}
 
-\begin{frame}{The Dapper System}
+\begin{frame}{The Dapper System }
 
 \begin{itemize}
-\item Large scale distributed systems tracing infrastructure created by Google
+\item Large-scale distributed systems tracing infrastructure created by Google\footfullcite{dapper}
 \item Annotation-based tracing scheme
 \item Common libraries instrumentation 
     \begin{itemize}
@@ -53,10 +58,15 @@ The basic unit of the process tree. Can represent a subsystem or a function
 call. To depict causal relationship each span has a parent span or is a
 \emph{root} span.
 \item[trace]
-A different trace id is used to group data related to he same initial request
+A different trace id is used to group data related to the same initial request
 \end{description}
 \end{frame}
 
+\begin{frame}{Causal realtionships}
+\begin{center}
+    \includegraphics[scale=0.3]{images/dapper.png} \\
+\end{center}
+\end{frame}
 \subsection{Zipkin}
 
 \begin{frame}{Zipkin}
@@ -105,7 +115,7 @@ OCaml
 \begin{frame}{Zipkin sum up}
 \setbeamertemplate{description item}[align left]
 \begin{description} \itemsep15pt
-\item[Zipkin] is a full stack tracing system using
+\item[Zipkin] is a full-stack tracing system using
 \item[Scribe] as its logging server using
 \item[Thrift] as its transport protocol
 \end{description}
